@@ -41,12 +41,18 @@ export type CycleStats = {
 
 const ITEM_MAX_AGE_DAYS = 7;
 const SETTLE_MINUTES = 30; // espera outras fontes repercutirem antes de redigir
-const LOCK_MINUTES = 20;
+export const LOCK_MINUTES = 20;
 
 export async function runNewsCycle(opts: CycleOptions): Promise<{ runId: string; stats: CycleStats }> {
   const { db } = opts;
   const now = opts.now ?? (() => new Date());
   const log = opts.log ?? (() => {});
+
+  // Ciclos que ficaram "running" além da janela da trava foram interrompidos (processo reiniciado).
+  await db.ingestionRun.updateMany({
+    where: { kind: "news_cycle", status: "running", startedAt: { lte: new Date(now().getTime() - LOCK_MINUTES * 60_000) } },
+    data: { status: "error", error: "Interrompido (processo encerrado antes do fim).", finishedAt: new Date() },
+  });
 
   // Trava simples contra execuções sobrepostas (cron + admin, por exemplo).
   const running = await db.ingestionRun.findFirst({

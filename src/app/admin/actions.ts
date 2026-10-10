@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -11,6 +12,7 @@ import { rateLimit, resetRateLimit } from "@/lib/auth/rate-limit";
 import { createSessionToken, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { approveAndPublish, editArticle, EditorialError, reject, reopen, retract } from "@/lib/news/editorial";
+import { LOCK_MINUTES } from "@/lib/news/pipeline";
 import { runConfiguredCycle } from "@/lib/news/run";
 
 // Server Actions do Next verificam Origin x Host (proteção CSRF) e só aceitam POST.
@@ -60,17 +62,28 @@ export async function logoutAction() {
 export async function runCycleAction(formData: FormData) {
   const user = await requireUser("admin");
   const ingestOnly = formData.get("ingestOnly") === "1";
-  let msg: string;
-  try {
-    const { stats } = await runConfiguredCycle("admin", { ingestOnly });
-    msg = `Ciclo concluído: ${stats.newItems} itens novos, ${stats.storiesCreated} pautas novas, ${stats.published} publicados, ${stats.sentToReview} para revisão.${stats.note ? " " + stats.note : ""}`;
-    await audit(`user:${user.id}`, "pipeline.run_manual", "ingestion_run", null, { ingestOnly });
-    revalidatePath("/");
-    revalidatePath("/news");
-  } catch (err) {
-    back("/admin", "erro", err instanceof Error ? err.message : "Falha no ciclo.");
+  const running = await db.ingestionRun.findFirst({
+    where: { kind: "news_cycle", status: "running", startedAt: { gt: new Date(Date.now() - LOCK_MINUTES * 60_000) } },
+    orderBy: { startedAt: "desc" },
+  });
+  if (running) {
+    const since = running.startedAt.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+    back("/admin", "erro", `Já há um ciclo rodando desde ${since}. Aguarde terminar (acompanhe em "Execuções recentes"); você pode revisar e aprovar matérias enquanto isso.`);
   }
-  back("/admin", "ok", msg);
+  await audit(`user:${user.id}`, "pipeline.run_manual", "ingestion_run", null, { ingestOnly });
+  // Roda DEPOIS da resposta: o painel não fica preso esperando a IA (planos gratuitos podem levar minutos).
+  after(async () => {
+    try {
+      const { stats } = await runConfiguredCycle("admin", { ingestOnly });
+      if (stats.published > 0) {
+        revalidatePath("/");
+        revalidatePath("/news");
+      }
+    } catch (err) {
+      console.error("[painel] ciclo falhou:", err instanceof Error ? err.message : err);
+    }
+  });
+  back("/admin", "ok", "Ciclo iniciado em segundo plano. Recarregue a página em alguns minutos e veja o resultado em \"Execuções recentes\" e na fila de revisão.");
 }
 
 export async function toggleSourceAction(formData: FormData) {

@@ -163,6 +163,21 @@ describe("pipeline da redação (integração)", () => {
     expect(await db.article.count({ where: { status: "in_review" } })).toBe(2);
   });
 
+  it("ciclo travado por processo encerrado é liberado após a janela da trava", async () => {
+    vi.stubGlobal("fetch", mockFetch());
+    const stale = await db.ingestionRun.create({
+      data: { kind: "news_cycle", trigger: "admin", status: "running", startedAt: new Date(now().getTime() - 30 * 60_000) },
+    });
+    await runNewsCycle({ db, ...base, ingestOnly: true });
+    expect((await db.ingestionRun.findUnique({ where: { id: stale.id } }))?.status).toBe("error");
+  });
+
+  it("ciclo recente em execução bloqueia um segundo ciclo", async () => {
+    const live = await db.ingestionRun.create({ data: { kind: "news_cycle", trigger: "admin", status: "running", startedAt: now() } });
+    await expect(runNewsCycle({ db, ...base, ingestOnly: true })).rejects.toThrow(/em execução/);
+    await db.ingestionRun.update({ where: { id: live.id }, data: { status: "ok" } });
+  });
+
   it("falha de fonte não derruba o ciclo", async () => {
     vi.stubGlobal(
       "fetch",
