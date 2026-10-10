@@ -1,0 +1,50 @@
+{
+  "name": "apex-grid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Apex Grid — Formula 1, decoded. Calendário, fusos, resultados, probabilidades e redação automatizada com fontes.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx scripts/seed.ts",
+    "admin:create": "tsx scripts/create-admin.ts",
+    "news:cycle": "tsx scripts/news-cycle.ts",
+    "news:ingest": "tsx scripts/news-cycle.ts --ingest-only"
+  },
+  "engines": {
+    "node": ">=20.9"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
+    "@prisma/client": "6.19",
+    "fast-xml-parser": "^5.11.2",
+    "next": "15.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "prisma": "6.19",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "5.9",
+    "vitest": "^3.2.7"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.28.2": true,
+    "prisma@6.19.3": true
+  }
+}
