@@ -65,6 +65,9 @@ const PT_SENTENCES = [
 
 class FakeAI implements EditorialAI {
   calls = 0;
+  async ping() {
+    return { ok: true as const, detail: "fake" };
+  }
   async write(sources: PromptSource[]) {
     this.calls++;
     const body = Array.from({ length: 12 }, (_, i) => PT_SENTENCES[i % PT_SENTENCES.length]!.replace("A sessão", `Parte ${i + 1}: a sessão`)).join("\n\n");
@@ -109,7 +112,7 @@ afterAll(async () => {
 describe("pipeline da redação (integração)", () => {
   const ai = new FakeAI();
   const now = () => new Date(T.getTime() + 2 * 3600_000);
-  const base = { trigger: "cli" as const, mode: "auto_restricted" as const, apiKey: "", model: "fake", maxPerRun: 5, maxPerDay: 24, fetchFullText: true, ai, now };
+  const base = { trigger: "cli" as const, mode: "auto_restricted" as const, maxPerRun: 5, maxPerDay: 24, fetchFullText: true, ai, now };
 
   it("monitora, deduplica, redige, checa e decide", async () => {
     vi.stubGlobal("fetch", mockFetch());

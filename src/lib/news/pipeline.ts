@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { robotsAllows, safeFetchText } from "../net/safe-fetch";
-import { AnthropicEditorialAI, type AgentResult, type EditorialAI } from "./ai";
+import type { AgentResult, EditorialAI } from "./ai";
 import { clusterItems, CLUSTER_WINDOW_HOURS } from "./cluster";
 import { extractArticleText } from "./extract";
 import { decidePublication, exclusionReason, sensitivityReasons, storyEligible, type FactCheckSummary } from "./policy";
@@ -15,12 +15,12 @@ export type CycleOptions = {
   trigger: "cron" | "admin" | "cli";
   ingestOnly?: boolean;
   mode: PublishMode;
-  apiKey: string;
-  model: string;
   maxPerRun: number;
   maxPerDay: number;
   fetchFullText: boolean;
-  ai?: EditorialAI; // injeção para testes
+  /** Provedor de IA já configurado (null = redação desativada). Ver ai-factory.ts. */
+  ai: EditorialAI | null;
+  aiUnavailableReason?: string;
   now?: () => Date;
   log?: (msg: string) => void;
 };
@@ -77,11 +77,10 @@ export async function runNewsCycle(opts: CycleOptions): Promise<{ runId: string;
       stats.note = "Somente monitoramento (ingestOnly).";
     } else if (opts.mode === "manual") {
       stats.note = "Modo manual: pautas agrupadas; nenhuma redação automática.";
-    } else if (!opts.apiKey && !opts.ai) {
-      stats.note = "ANTHROPIC_API_KEY ausente: pautas agrupadas; redação automática desativada.";
+    } else if (!opts.ai) {
+      stats.note = `${opts.aiUnavailableReason ?? "IA não configurada"}: pautas agrupadas; redação automática desativada.`;
     } else {
-      const ai = opts.ai ?? new AnthropicEditorialAI(opts.apiKey, opts.model);
-      await writeStories(db, ai, opts, stats, now, log);
+      await writeStories(db, opts.ai, opts, stats, now, log);
     }
 
     const anySourceFailed = Object.values(stats.sources).some((s) => !s.ok);

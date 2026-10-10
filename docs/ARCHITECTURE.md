@@ -96,7 +96,8 @@ Monte Carlo com Plackett-Luce ponderado por recência, choque de equipe comparti
 |---|---|---|
 | Jolpica-F1 API | calendário, resultados, classificação | gratuita, comunitária; limites ~4 req/s, 500 req/h |
 | Feeds RSS (7) | monitoramento de notícias | públicos; ver política em NEWSROOM.md |
-| Anthropic Claude API | Redator e Verificador | opcional; sem chave o sistema só monitora |
+| Anthropic Claude API | Redator e Verificador (produção) | opcional; sem chave o sistema só monitora |
+| Google Gemini API (compatível com OpenAI) | Redator e Verificador (testes, plano gratuito) | ver docs/GEMINI.md |
 | Google Fonts (build) | Inter, Barlow Condensed, JetBrains Mono | baixadas no build e servidas localmente pelo Next |
 | npm: next, react, prisma, zod, fast-xml-parser, @anthropic-ai/sdk, tailwindcss, vitest | — | versões fixadas por major |
 
@@ -122,4 +123,4 @@ Monte Carlo com Plackett-Luce ponderado por recência, choque de equipe comparti
 - [x] Pipeline de notícias executado contra os **feeds reais** (7/7 fontes OK, 164 itens, 91 pautas) e testado ponta a ponta com IA simulada em SQLite real.
 - [ ] Redação com a API real do Claude — **não validada nesta máquina** (sem `ANTHROPIC_API_KEY`). Ver README → "Validar a redação com IA".
 - [x] Admin com login, sessão httpOnly, RBAC, rate limit e proteção CSRF verificados contra o servidor de produção local.
-- [x] `npm run build`, `tsc` e 78 testes passando.
+- [x] `npm run build`, `tsc` e 89 testes passando.

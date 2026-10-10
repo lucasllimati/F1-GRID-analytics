@@ -14,7 +14,8 @@
     "db:deploy": "prisma migrate deploy",
     "admin:create": "tsx scripts/create-admin.ts",
     "news:cycle": "tsx scripts/news-cycle.ts",
-    "news:ingest": "tsx scripts/news-cycle.ts --ingest-only"
+    "news:ingest": "tsx scripts/news-cycle.ts --ingest-only",
+    "ai:check": "tsx scripts/ai-check.ts"
   },
   "engines": {
     "node": ">=20.9"

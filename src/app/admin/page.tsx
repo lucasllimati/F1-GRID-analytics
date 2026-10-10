@@ -4,6 +4,7 @@ import { Badge, Card, Container, SectionHeading } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { createEditorialAI } from "@/lib/news/ai-factory";
 import { sourceById } from "@/lib/news/sources";
 import { ARTICLE_STATUS_LABEL, type ArticleStatus } from "@/lib/news/states";
 import { logoutAction, runCycleAction, toggleSourceAction } from "./actions";
@@ -17,6 +18,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
   const user = await requireUser();
   const sp = await searchParams;
   const e = env();
+  const aiSel = createEditorialAI(e);
   const dayAgo = new Date(Date.now() - 86_400_000);
   const monthAgo = new Date(Date.now() - 30 * 86_400_000);
 
@@ -44,7 +46,14 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
           <h1 className="font-display text-3xl font-bold uppercase">Painel da redação</h1>
           <p className="text-sm text-muted">
             {user.name} · {user.role === "admin" ? "Administrador" : "Editor"} · modo de publicação <strong>{e.NEWS_PUBLISH_MODE}</strong> ·
-            IA {e.ANTHROPIC_API_KEY ? <span className="text-ok">configurada ({e.NEWS_AI_MODEL})</span> : <span className="text-warn">sem chave</span>}
+            IA{" "}
+            {aiSel.ai ? (
+              <span className="text-ok">
+                {aiSel.provider} ({aiSel.model})
+              </span>
+            ) : (
+              <span className="text-warn">desativada — {aiSel.reason}</span>
+            )}
           </p>
         </div>
         <form action={logoutAction}>

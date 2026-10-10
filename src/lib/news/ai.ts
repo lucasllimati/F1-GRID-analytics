@@ -49,7 +49,11 @@ export type AgentResult<T> =
   | { ok: true; data: T; usage: Usage; model: string; promptVersion: string }
   | { ok: false; error: string; refused: boolean; usage: Usage; model: string; promptVersion: string };
 
+export type PingResult = { ok: true; detail: string } | { ok: false; detail: string };
+
 export interface EditorialAI {
+  /** Chamada mínima para validar chave, modelo e conectividade (npm run ai:check). */
+  ping(): Promise<PingResult>;
   write(sources: PromptSource[]): Promise<AgentResult<Draft>>;
   factCheck(sources: PromptSource[], draft: Pick<Draft, "headline" | "dek" | "body">): Promise<AgentResult<FactCheck>>;
 }
@@ -124,6 +128,18 @@ export class AnthropicEditorialAI implements EditorialAI {
       else if (err instanceof Anthropic.APIError) msg = `Erro da API (${err.status}): ${err.message}`;
       else if (err instanceof Error) msg = err.message;
       return { ok: false, error: msg, refused: false, usage: empty, model: this.model, promptVersion };
+    }
+  }
+
+  async ping(): Promise<PingResult> {
+    try {
+      const m = await this.client.models.retrieve(this.model);
+      return { ok: true, detail: `modelo ${m.id} acessível` };
+    } catch (err) {
+      if (err instanceof Anthropic.AuthenticationError) return { ok: false, detail: "Chave da API inválida" };
+      if (err instanceof Anthropic.NotFoundError) return { ok: false, detail: `Modelo não encontrado: ${this.model}` };
+      if (err instanceof Anthropic.APIError) return { ok: false, detail: `Erro da API (${err.status})` };
+      return { ok: false, detail: err instanceof Error ? err.message : "Erro desconhecido" };
     }
   }
 
