@@ -52,3 +52,23 @@ export function Countdown({ targetIso, label }: { targetIso: string; label: stri
     </div>
   );
 }
+
+/** Escolhe, no navegador, a próxima sessão com horário oficial futuro. */
+export function NextSessionCountdown({ sessions }: { sessions: { label: string; startsAt: string | null }[] }) {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  if (!now) return <div className="h-[92px]" aria-hidden="true" />;
+  const next = sessions.find((s) => s.startsAt && Date.parse(s.startsAt) > now.getTime());
+  if (!next || !next.startsAt) {
+    return (
+      <p className="text-sm text-muted" role="status">
+        Todas as sessões previstas deste evento já passaram do horário oficial. Aguardando publicação dos resultados pela fonte.
+      </p>
+    );
+  }
+  return <Countdown key={next.startsAt} targetIso={next.startsAt} label={next.label} />;
+}

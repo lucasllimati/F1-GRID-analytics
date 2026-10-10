@@ -12,7 +12,6 @@
     "test:watch": "vitest",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "tsx scripts/seed.ts",
     "admin:create": "tsx scripts/create-admin.ts",
     "news:cycle": "tsx scripts/news-cycle.ts",
     "news:ingest": "tsx scripts/news-cycle.ts --ingest-only"

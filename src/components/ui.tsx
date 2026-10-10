@@ -1,4 +1,9 @@
 import type { ReactNode } from "react";
+import type { EventStatus } from "@/lib/f1/types";
+
+export function statusTone(s: EventStatus): "neutral" | "info" | "warn" {
+  return s === "completed" ? "neutral" : s === "upcoming" ? "info" : "warn";
+}
 
 export function Container({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`mx-auto max-w-7xl px-4 ${className}`}>{children}</div>;

@@ -44,7 +44,7 @@ export async function radarItems(take = 12) {
       where: { excluded: false },
       orderBy: { publishedAt: "desc" },
       take,
-      select: { id: true, title: true, url: true, publishedAt: true, source: { select: { name: true, language: true } } },
+      select: { id: true, title: true, url: true, publishedAt: true, publishedAtKnown: true, source: { select: { name: true, language: true } } },
     });
   } catch {
     return [];

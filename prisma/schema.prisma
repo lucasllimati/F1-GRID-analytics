@@ -41,6 +41,8 @@ model FeedItem {
   title             String
   summary           String     @default("")
   publishedAt       DateTime
+  // false quando o feed não informa data: publishedAt = horário da coleta (nunca exibido como publicação)
+  publishedAtKnown  Boolean    @default(true)
   fetchedAt         DateTime   @default(now())
   // Texto extraído da página original, usado SOMENTE como evidência interna
   // para checagem de fatos. Nunca é exibido ou republicado.
@@ -74,30 +76,30 @@ model Story {
 // ── Redação ────────────────────────────────────────────────────────
 
 model Article {
-  id                String           @id @default(cuid())
-  slug              String           @unique
-  storyId           String?          @unique
-  story             Story?           @relation(fields: [storyId], references: [id])
-  status            String // ver ARTICLE_STATUSES em src/lib/news/states.ts
-  origin            String           @default("ai") // ai | human
-  category          String
-  headline          String
-  dek               String
-  body              String // Markdown restrito (parágrafos, subtítulos, listas)
-  readingMinutes    Int
-  sensitive         Boolean          @default(false)
-  reviewReasons     String           @default("[]") // JSON string[]: por que precisa de revisão humana
-  factCheckScore    Float? // fração de afirmações sustentadas pelas fontes
-  correctionNote    String?
-  publishedAt       DateTime?
-  approvedById      String?
-  approvedBy        AdminUser?       @relation(fields: [approvedById], references: [id])
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  versions          ArticleVersion[]
-  sources           ArticleSource[]
-  claims            ArticleClaim[]
-  agentRuns         AgentRun[]
+  id             String           @id @default(cuid())
+  slug           String           @unique
+  storyId        String?          @unique
+  story          Story?           @relation(fields: [storyId], references: [id])
+  status         String // ver ARTICLE_STATUSES em src/lib/news/states.ts
+  origin         String           @default("ai") // ai | human
+  category       String
+  headline       String
+  dek            String
+  body           String // Markdown restrito (parágrafos, subtítulos, listas)
+  readingMinutes Int
+  sensitive      Boolean          @default(false)
+  reviewReasons  String           @default("[]") // JSON string[]: por que precisa de revisão humana
+  factCheckScore Float? // fração de afirmações sustentadas pelas fontes
+  correctionNote String?
+  publishedAt    DateTime?
+  approvedById   String?
+  approvedBy     AdminUser?       @relation(fields: [approvedById], references: [id])
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  versions       ArticleVersion[]
+  sources        ArticleSource[]
+  claims         ArticleClaim[]
+  agentRuns      AgentRun[]
 
   @@index([status, publishedAt])
 }
@@ -118,16 +120,17 @@ model ArticleVersion {
 }
 
 model ArticleSource {
-  id          String    @id @default(cuid())
-  articleId   String
-  article     Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  feedItemId  String?
-  publisher   String
-  sourceId    String
-  url         String
-  title       String
-  publishedAt DateTime
-  accessedAt  DateTime  @default(now())
+  id               String   @id @default(cuid())
+  articleId        String
+  article          Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  feedItemId       String?
+  publisher        String
+  sourceId         String
+  url              String
+  title            String
+  publishedAt      DateTime
+  publishedAtKnown Boolean  @default(true)
+  accessedAt       DateTime @default(now())
 
   @@index([articleId])
 }

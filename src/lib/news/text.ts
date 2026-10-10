@@ -134,7 +134,7 @@ export function copyOverlap(ours: string, source: string, n = 8): { ratio: numbe
 }
 
 export function slugify(s: string, maxLen = 80): string {
-  const base = foldAccents(s.toLowerCase())
+  const base = foldAccents(s.toLowerCase().replace(/º/g, "o").replace(/ª/g, "a"))
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return base.slice(0, maxLen).replace(/-+$/g, "") || "noticia";
