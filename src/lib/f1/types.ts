@@ -177,4 +177,6 @@ export interface F1DataProvider {
   getQualifying(season: number, round: number): Promise<SessionResult<QualifyingRow> | null>;
   /** Todos os resultados de corrida (ou sprint) de uma temporada. */
   getSeasonResults(season: number, kind: "race" | "sprint"): Promise<SessionResult<RaceResultRow>[]>;
+  /** Todas as classificações (qualifying) de uma temporada. */
+  getSeasonQualifying(season: number): Promise<SessionResult<QualifyingRow>[]>;
 }

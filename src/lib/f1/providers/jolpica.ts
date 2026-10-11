@@ -385,6 +385,38 @@ export class JolpicaProvider implements F1DataProvider {
     };
   }
 
+  async getSeasonQualifying(season: number): Promise<SessionResult<QualifyingRow>[]> {
+    const byRound = new Map<number, SessionResult<QualifyingRow>>();
+    const pageSize = 100;
+    let offset = 0;
+    for (let guard = 0; guard < 20; guard++) {
+      const data = mrData(await getJson(`/${season}/qualifying.json?limit=${pageSize}&offset=${offset}`, { revalidate: 1800 }));
+      const total = Number(data.total ?? 0);
+      const races = z
+        .array(z.object({ round: z.string(), raceName: z.string(), QualifyingResults: z.array(zQuali).optional() }))
+        .parse(z.object({ Races: z.array(z.unknown()) }).parse(data.RaceTable).Races);
+      for (const r of races) {
+        const round = Number(r.round);
+        const rows = (r.QualifyingResults ?? []).map((q) => ({
+          position: toInt(q.position),
+          number: q.number ?? null,
+          driver: driverRef(q.Driver),
+          constructor: constructorRef(q.Constructor),
+          q1: q.Q1 || null,
+          q2: q.Q2 || null,
+          q3: q.Q3 || null,
+        }));
+        const existing = byRound.get(round);
+        if (existing) existing.rows.push(...rows);
+        else
+          byRound.set(round, { season, round, raceName: r.raceName, kind: "qualifying", rows, source: this.info, fetchedAt: new Date().toISOString() });
+      }
+      offset += pageSize;
+      if (offset >= total) break;
+    }
+    return [...byRound.values()].sort((a, b) => a.round - b.round);
+  }
+
   async getSeasonResults(season: number, kind: "race" | "sprint"): Promise<SessionResult<RaceResultRow>[]> {
     const endpoint = kind === "race" ? "results" : "sprint";
     const key = kind === "race" ? "Results" : "SprintResults";

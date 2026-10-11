@@ -9,6 +9,7 @@ export const NAV = [
   { href: "/results", label: "Resultados" },
   { href: "/standings", label: "Classificação" },
   { href: "/championship-probabilities", label: "Probabilidades" },
+  { href: "/head-to-head", label: "Comparar" },
   { href: "/news", label: "Notícias" },
 ];
 

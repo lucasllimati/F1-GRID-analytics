@@ -51,6 +51,22 @@ export function eventStart(event: RaceEvent): Date | null {
   return new Date(first.startsAt ?? `${first.date}T00:00:00Z`);
 }
 
+/**
+ * Sessões que ainda distribuem pontos, segundo o que JÁ FOI PUBLICADO:
+ * corrida restante = sem resultado de corrida; sprint restante = etapa Sprint sem resultado de sprint.
+ * (Durante um fim de semana Sprint, a sprint pode já valer pontos antes da corrida.)
+ */
+export function remainingScoringSessions(
+  events: RaceEvent[],
+  publishedRaceRounds: Set<number>,
+  publishedSprintRounds: Set<number>,
+): { races: number; sprints: number } {
+  return {
+    races: events.filter((e) => !publishedRaceRounds.has(e.round)).length,
+    sprints: events.filter((e) => e.format === "sprint" && !publishedSprintRounds.has(e.round)).length,
+  };
+}
+
 export function raceSession(event: RaceEvent): Session | null {
   return event.sessions.find((s) => s.type === "race") ?? null;
 }

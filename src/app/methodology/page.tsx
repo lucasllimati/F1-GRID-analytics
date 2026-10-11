@@ -88,6 +88,34 @@ export default function MethodologyPage() {
         </section>
 
         <section className="space-y-3">
+          <SectionHeading title="Comparativos e tendências" />
+          <p>
+            Todas as métricas do comparativo são calculadas a partir de resultados oficiais publicados de corridas, sprints e classificações. A{" "}
+            <strong>posição no campeonato</strong> etapa a etapa é recalculada somando os pontos publicados e aplicando o desempate oficial (mais
+            vitórias, depois mais 2º lugares, e assim por diante); conferimos que ela coincide com a classificação oficial.
+          </p>
+          <ul className="list-disc space-y-1.5 pl-5">
+            <li>
+              <strong>Equipes</strong>: posição de chegada e de classificação = melhor carro; pontos = soma dos dois carros.
+            </li>
+            <li>
+              <strong>Chegada média</strong> considera só provas terminadas classificado; abandonos aparecem como interrupção na linha, nunca como
+              posição inventada.
+            </li>
+            <li>
+              <strong>Confronto direto em corrida</strong>: conta quando ao menos um terminou classificado; classificado vence não classificado.
+            </li>
+            <li>
+              <strong>Tendência</strong>: média de pontos por etapa nas últimas 5 comparada com a média anterior; variação menor que 15% (mínimo 1
+              ponto) é considerada estável. Com menos de 3 etapas antes das últimas 5, a tendência não é calculada.
+            </li>
+            <li>
+              Num fim de semana Sprint em andamento, a sprint e a classificação já entram nos gráficos antes do resultado da corrida.
+            </li>
+          </ul>
+        </section>
+
+        <section className="space-y-3">
           <SectionHeading title="Notícias geradas com IA" />
           <p>
             Veja a página <a href="/sources" className="underline">Fontes e política editorial</a> para o processo completo, os critérios de

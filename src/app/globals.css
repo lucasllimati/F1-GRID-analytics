@@ -18,6 +18,11 @@
   --warn: #f5b301;
   --info: #4ea3ff;
   --grid-line: rgba(255, 255, 255, 0.04);
+  /* Séries categóricas dos gráficos (validadas: CVD e contraste vs. #121418) */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
   color-scheme: dark;
 }
 
@@ -37,6 +42,11 @@
   --warn: #9a6b00;
   --info: #1f6fd1;
   --grid-line: rgba(0, 0, 0, 0.04);
+  /* Validadas vs. #ffffff; aqua e amarelo < 3:1 → gráficos sempre com rótulos diretos e tabela */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
   color-scheme: light;
 }
 

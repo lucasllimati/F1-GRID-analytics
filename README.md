@@ -32,16 +32,17 @@ Comece sempre em `NEWS_PUBLISH_MODE="semi"` (tudo vai para revisão em `/admin`)
 | Comando | O que faz |
 |---|---|
 | `npm run dev` / `build` / `start` | Next.js |
-| `npm test` | 89 testes (fusos/DST, pontuação, modelo, RSS, deduplicação, política editorial, segurança, pipeline integrado) |
+| `npm test` | 104 testes (fusos/DST, pontuação, modelo, RSS, deduplicação, política editorial, segurança, pipeline integrado) |
 | `npm run lint` | checagem de tipos |
 | `npm run news:ingest` | monitora as 7 fontes e agrupa pautas |
 | `npm run news:cycle` | ciclo completo (monitorar → redigir → checar → publicar/revisar) |
 | `npm run admin:create` | cria/atualiza usuário da redação |
+| `npm run ai:check` | testa a conexão com a IA configurada |
 | `npm run db:migrate` / `db:deploy` | migrations |
 
 ## Páginas
 
-`/` · `/race-center` · `/calendar` · `/calendar/[ano]/[etapa]` · `/results` · `/standings` · `/championship-probabilities` · `/news` · `/news/[slug]` · `/sources` · `/methodology` · `/about` · `/privacy` · `/feed.xml` · `/admin`
+`/` · `/race-center` · `/calendar` · `/calendar/[ano]/[etapa]` · `/results` · `/standings` · `/championship-probabilities` · `/head-to-head` (comparar pilotos/equipes) · `/news` · `/news/[slug]` · `/sources` · `/methodology` · `/about` · `/privacy` · `/feed.xml` · `/admin`
 
 ## Documentação
 

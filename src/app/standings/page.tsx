@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LineChart, type Series } from "@/components/line-chart";
+import { TrendChart, type ChartSeries } from "@/components/charts";
 import { Card, Container, ErrorState, PageHeader, SectionHeading, SourceNote } from "@/components/ui";
+import { analyzeEntity, championshipPositions, seasonRounds, type SeasonData } from "@/lib/f1/compare";
 import { driverName, f1, load } from "@/lib/f1/service";
 
 export const revalidate = 900;
@@ -20,38 +21,37 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
   const [dsR, csR] = await Promise.all([load(f1.getDriverStandings(key)), load(f1.getConstructorStandings(key))]);
   const seasonNum = dsR.ok ? dsR.data.season : (season ?? thisYear);
   const [racesR, sprintsR] = await Promise.all([load(f1.getSeasonResults(seasonNum, "race")), load(f1.getSeasonResults(seasonNum, "sprint"))]);
+  const data: SeasonData = { races: racesR.ok ? racesR.data : [], sprints: sprintsR.ok ? sprintsR.data : [], qualis: [] };
 
-  // Posição na etapa anterior: recalculada somando os pontos publicados até a rodada anterior.
-  const rounds = racesR.ok ? racesR.data.map((r) => r.round) : [];
-  const cumulative = new Map<string, number[]>();
-  const names = new Map<string, string>();
-  if (racesR.ok) {
-    const sprintByRound = new Map((sprintsR.ok ? sprintsR.data : []).map((s) => [s.round, s]));
-    const running = new Map<string, number>();
-    rounds.forEach((round, idx) => {
-      const race = racesR.data[idx]!;
-      for (const row of [...race.rows, ...(sprintByRound.get(round)?.rows ?? [])]) {
-        names.set(row.driver.id, driverName(row.driver));
-        running.set(row.driver.id, (running.get(row.driver.id) ?? 0) + row.points);
-      }
-      for (const [id, pts] of running) {
-        const arr = cumulative.get(id) ?? new Array(idx).fill(0);
-        while (arr.length < idx) arr.push(0);
-        arr.push(pts);
-        cumulative.set(id, arr);
-      }
-    });
-  }
-  const prevRank = new Map<string, number>();
-  if (rounds.length >= 2) {
-    const prev = [...cumulative.entries()].map(([id, arr]) => [id, arr[rounds.length - 2] ?? 0] as const).sort((a, b) => b[1] - a[1]);
-    prev.forEach(([id], i) => prevRank.set(id, i + 1));
-  }
+  // Etapas com corrida OU sprint publicada (num fim de semana Sprint, a sprint pontua antes da corrida).
+  const rounds = seasonRounds(data);
+  const driverChamp = championshipPositions(data, "driver");
+  const teamChamp = championshipPositions(data, "team");
+  // Variação: posição recalculada após a etapa anterior (mesmo critério de desempate oficial).
+  const prevRound = rounds.length >= 2 ? rounds[rounds.length - 2]!.round : null;
+  const prevRank = prevRound !== null ? (driverChamp.get(prevRound) ?? new Map<string, number>()) : new Map<string, number>();
 
   const ds = dsR.ok ? dsR.data : null;
-  const top: Series[] = (ds?.rows.slice(0, 5) ?? [])
-    .map((r) => ({ id: r.driver.id, label: r.driver.code ?? r.driver.familyName, values: cumulative.get(r.driver.id) ?? [] }))
-    .filter((s) => s.values.length > 0);
+  const cs = csR.ok ? csR.data : null;
+  const xLabels = rounds.map((r) => `E${r.round}`);
+  const xTitles = rounds.map((r) => r.raceName.replace(" Grand Prix", "") + (r.hasRace ? "" : " (só sprint)"));
+  // Até 4 séries: limite da paleta categórica validada.
+  const driverSeries: ChartSeries[] = (ds?.rows.slice(0, 4) ?? [])
+    .map((r, slot) => ({
+      id: r.driver.id,
+      label: r.driver.code ?? r.driver.familyName,
+      slot,
+      values: analyzeEntity(data, "driver", r.driver.id, driverChamp)?.rounds.map((x) => x.cumulative) ?? [],
+    }))
+    .filter((x) => x.values.length > 0);
+  const teamSeries: ChartSeries[] = (cs?.rows.slice(0, 4) ?? [])
+    .map((r, slot) => ({
+      id: r.constructor.id,
+      label: r.constructor.name,
+      slot,
+      values: analyzeEntity(data, "team", r.constructor.id, teamChamp)?.rounds.map((x) => x.cumulative) ?? [],
+    }))
+    .filter((x) => x.values.length > 0);
 
   return (
     <>
@@ -156,17 +156,43 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
           </section>
         </div>
 
-        {top.length > 0 && (
+        {(driverSeries.length > 0 || teamSeries.length > 0) && (
           <section className="mt-12" aria-labelledby="evolution">
-            <SectionHeading id="evolution" kicker="Top 5 atual" title="Evolução dos pontos" />
-            <Card className="p-4">
-              <LineChart series={top} xLabels={rounds.map((r) => `E${r}`)} title="Pontos acumulados por etapa (corrida + sprint)" unit="pontos" />
-            </Card>
+            <SectionHeading
+              id="evolution"
+              kicker="Top 4 atual"
+              title="Evolução dos pontos"
+              action={
+                <Link href={`/head-to-head?season=${seasonNum}`} className="text-sm font-semibold text-accent hover:underline">
+                  Comparar quem você quiser →
+                </Link>
+              }
+            />
+            <div className="grid gap-6">
+              <Card className="p-4 sm:p-6">
+                <TrendChart
+                  title="Pilotos"
+                  caption="Pontos acumulados após cada etapa (corrida + sprint)."
+                  series={driverSeries}
+                  xLabels={xLabels}
+                  xTitles={xTitles}
+                />
+              </Card>
+              <Card className="p-4 sm:p-6">
+                <TrendChart
+                  title="Construtores"
+                  caption="Pontos acumulados após cada etapa (corrida + sprint)."
+                  series={teamSeries}
+                  xLabels={xLabels}
+                  xTitles={xTitles}
+                />
+              </Card>
+            </div>
           </section>
         )}
         <SourceNote>
-          Fonte: Jolpica-F1. Variação de posição calculada pela soma de pontos de corridas e sprints publicados até a etapa anterior; pode
-          divergir em casos de pontos retirados por decisão posterior. Veja também as{" "}
+          Fonte: Jolpica-F1. Variação de posição recalculada a partir dos resultados publicados até a etapa anterior, com o desempate oficial
+          (vitórias, 2º lugares…); pode divergir em casos de pontos retirados por decisão posterior. Veja também as{" "}
           <Link href="/championship-probabilities" className="underline">
             probabilidades de título
           </Link>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mapOutcome, mapRace } from "@/lib/f1/providers/jolpica";
 import { compareCountback, maxRemainingDriverPoints, maxRemainingTeamPoints, pointsSystem, racePoints, sprintPoints } from "@/lib/f1/points";
-import { deriveEventStatus, nextSession } from "@/lib/f1/schedule";
+import { deriveEventStatus, nextSession, remainingScoringSessions } from "@/lib/f1/schedule";
 import type { Session } from "@/lib/f1/types";
 
 // Fixture no formato real da Jolpica (etapa Sprint de 2026, campos reduzidos).
@@ -97,5 +97,14 @@ describe("pontuação por temporada", () => {
     expect(compareCountback([3, 1], [2, 5])).toBeLessThan(0);
     expect(compareCountback([2, 1], [2, 3])).toBeGreaterThan(0);
     expect(compareCountback([1, 1], [1, 1])).toBe(0);
+  });
+});
+
+describe("sessões restantes que pontuam", () => {
+  it("fim de semana Sprint em andamento: sprint publicada, corrida ainda não", () => {
+    const e17 = mapRace(sprintRace, false, new Date("2026-10-11T12:30:00Z"));
+    const e18 = mapRace({ ...sprintRace, round: "18", Sprint: undefined, SprintQualifying: undefined }, false, new Date());
+    const r = remainingScoringSessions([e17, e18], new Set([16]), new Set([17]));
+    expect(r).toEqual({ races: 2, sprints: 0 });
   });
 });

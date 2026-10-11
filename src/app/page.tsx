@@ -4,7 +4,7 @@ import { NewsCard } from "@/components/news-card";
 import { LocalTime, SessionTimesTable } from "@/components/timezone";
 import { Badge, Card, Container, EmptyState, ErrorState, SectionHeading, SourceNote, statusTone } from "@/components/ui";
 import { maxRemainingDriverPoints, pointsSystem } from "@/lib/f1/points";
-import { eventStart, lastCompletedEvent, nextEvent } from "@/lib/f1/schedule";
+import { eventStart, lastCompletedEvent, nextEvent, remainingScoringSessions } from "@/lib/f1/schedule";
 import { driverName, f1, load } from "@/lib/f1/service";
 import { EVENT_STATUS_LABEL, OUTCOME_LABEL, SESSION_LABEL } from "@/lib/f1/types";
 import { listPublished, radarItems } from "@/lib/news/queries";
@@ -24,21 +24,26 @@ export default async function HomePage() {
   const upcoming = nextEvent(events);
   const last = lastCompletedEvent(events);
   const season = events[0]?.season ?? new Date().getUTCFullYear();
-  const [lastResultR, seasonResultsR] = await Promise.all([
+  const [lastResultR, seasonResultsR, sprintResultsR] = await Promise.all([
     last ? load(f1.getRaceResult(last.season, last.round)) : Promise.resolve(null),
     load(f1.getSeasonResults(season, "race")),
+    load(f1.getSeasonResults(season, "sprint")),
   ]);
 
   const ds = dsR.ok ? dsR.data : null;
   const cs = csR.ok ? csR.data : null;
   const leader = ds?.rows[0];
   const second = ds?.rows[1];
-  const remaining = ds ? events.filter((e) => e.round > ds.round) : [];
-  const maxLeft = maxRemainingDriverPoints(
-    pointsSystem(season),
-    remaining.length,
-    remaining.filter((e) => e.format === "sprint").length,
-  );
+  const remainingSessions =
+    seasonResultsR.ok && sprintResultsR.ok
+      ? remainingScoringSessions(
+          events,
+          new Set(seasonResultsR.data.map((r) => r.round)),
+          new Set(sprintResultsR.data.map((s) => s.round)),
+        )
+      : null;
+  const remaining = { length: remainingSessions?.races ?? 0 };
+  const maxLeft = remainingSessions ? maxRemainingDriverPoints(pointsSystem(season), remainingSessions.races, remainingSessions.sprints) : 0;
 
   // Destaques derivados de resultados oficiais publicados na fonte.
   const seasonResults = seasonResultsR.ok ? seasonResultsR.data : [];
