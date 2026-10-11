@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { NextSessionCountdown } from "@/components/countdown";
-import { NewsCard } from "@/components/news-card";
+import { NewsGrid } from "@/components/news-card";
 import { LocalTime, SessionTimesTable } from "@/components/timezone";
 import { Badge, Card, Container, EmptyState, ErrorState, SectionHeading, SourceNote, statusTone } from "@/components/ui";
 import { maxRemainingDriverPoints, pointsSystem } from "@/lib/f1/points";
@@ -284,16 +284,7 @@ export default async function HomePage() {
             A redação publica apenas textos que passaram pela checagem de fatos. Enquanto isso, veja o radar de fontes abaixo.
           </EmptyState>
         ) : (
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {articles[0] && (
-              <div className="md:col-span-2">
-                <NewsCard a={articles[0]} featured />
-              </div>
-            )}
-            {articles.slice(1).map((a) => (
-              <NewsCard key={a.id} a={a} />
-            ))}
-          </div>
+          <NewsGrid articles={articles} />
         )}
         {radar.length > 0 && (
           <Card className="mt-6 p-5">

@@ -10,7 +10,7 @@ import type { PublishMode } from "./states";
 const NON_NEWS = [
   /\bbet(ting)?\b|\bbet builder\b|\bodds\b|\bapostas?\b/i,
   /\bquiz\b|\bpodcast\b|\bgallery\b|\bgaleria\b|\bwallpapers?\b|\bfantasy\b/i,
-  /\bas it happened\b|\blive (updates|blog|text|commentary)\b|\bao vivo\b|\btempo real\b/i,
+  /\bas it happened\b|\blive (updates|blog|text|commentary|coverage)\b|\bao vivo\b|\btempo real\b|\blap[- ]by[- ]lap\b/i,
   /\b(watch|video|vídeo|assista)\s*:/i,
   /\btickets?\b|\bingressos?\b|\bcompetition\b|\bwin an?\b|\bsorteio\b|\bpromo(ção|tion)\b/i,
   /\bhow to watch\b|\bonde assistir\b|\btv schedule\b/i,
@@ -19,10 +19,18 @@ const NON_NEWS = [
 const F1_KEYWORDS =
   /\b(f1|formula 1|formula one|fórmula 1|grand prix|grande pr[eê]mio|ferrari|mercedes|mclaren|red bull|aston martin|alpine|williams|haas|sauber|audi|cadillac|racing bulls)\b/i;
 
+const OTHER_SERIES =
+  /\b(motogp|moto2|moto3|worldsbk|superbike|indycar|indy 500|nascar|wec|le mans|imsa|formula e|fórmula e|wrc|rally|dakar|supercars|btcc|dtm)\b/i;
+
 export function exclusionReason(source: SourceDef, title: string, summary: string): string | null {
   const t = `${title} ${summary}`;
   for (const re of NON_NEWS) if (re.test(title)) return "não-notícia (promocional, apostas, vídeo, ao vivo ou similar)";
-  if (source.requireF1Keyword && !F1_KEYWORDS.test(t)) return "fora do escopo da Fórmula 1";
+  if (source.requireF1Keyword) {
+    // Feeds multiesportivos: título que cita outra categoria e não cita F1 fica de fora,
+    // mesmo que o resumo mencione um nome de equipe de F1.
+    if (OTHER_SERIES.test(title) && !F1_KEYWORDS.test(title)) return "fora do escopo da Fórmula 1";
+    if (!F1_KEYWORDS.test(t)) return "fora do escopo da Fórmula 1";
+  }
   return null;
 }
 

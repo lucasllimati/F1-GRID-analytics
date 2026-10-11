@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { NewsCard } from "@/components/news-card";
+import { NewsCard, NewsGrid } from "@/components/news-card";
 import { LocalTime } from "@/components/timezone";
 import { Card, Container, EmptyState, PageHeader, SectionHeading } from "@/components/ui";
 import { countPublished, listPublished, radarItems } from "@/lib/news/queries";
@@ -60,13 +60,16 @@ export default async function NewsPage({ searchParams }: { searchParams: Promise
         {articles.length === 0 ? (
           <EmptyState title="Nenhuma matéria publicada nesta seção ainda" />
         ) : (
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {articles.map((a, i) => (
-              <div key={a.id} className={i === 0 && page === 1 ? "md:col-span-2" : ""}>
-                <NewsCard a={a} featured={i === 0 && page === 1} />
-              </div>
-            ))}
-          </div>
+          page === 1 ? (
+            // Primeira página: manchete + "Mais recentes" + grade.
+            <NewsGrid articles={articles} />
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {articles.map((a) => (
+                <NewsCard key={a.id} a={a} />
+              ))}
+            </div>
+          )
         )}
 
         {pages > 1 && (

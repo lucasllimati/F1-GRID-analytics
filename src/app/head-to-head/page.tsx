@@ -14,6 +14,7 @@ import {
   type SeasonData,
   type Summary,
 } from "@/lib/f1/compare";
+import { fallbackLabel, roundLabels } from "@/lib/f1/round-labels";
 import { f1, load } from "@/lib/f1/service";
 import { OUTCOME_LABEL } from "@/lib/f1/types";
 
@@ -70,10 +71,11 @@ export default async function HeadToHeadPage({ searchParams }: { searchParams: P
   const season = /^\d{4}$/.test(sp.season ?? "") ? Math.min(Math.max(Number(sp.season), 2010), thisYear) : thisYear;
   const kind: EntityKind = sp.kind === "team" ? "team" : "driver";
 
-  const [racesR, sprintsR, qualisR] = await Promise.all([
+  const [racesR, sprintsR, qualisR, eventsR] = await Promise.all([
     load(f1.getSeasonResults(season, "race")),
     load(f1.getSeasonResults(season, "sprint")),
     load(f1.getSeasonQualifying(season)),
+    load(f1.getSchedule(season)),
   ]);
 
   const header = (
@@ -108,8 +110,11 @@ export default async function HeadToHeadPage({ searchParams }: { searchParams: P
 
   const allRounds = seasonRounds(data);
   const rounds = allRounds.map((r) => r.round);
-  const xLabels = rounds.map((r) => `E${r}`);
-  const xTitles = allRounds.map((r) => r.raceName.replace(" Grand Prix", "") + (r.hasRace ? "" : " (corrida sem resultado ainda)"));
+  const labels = eventsR.ok ? roundLabels(eventsR.data) : new Map();
+  const roundInfo = allRounds.map((r) => labels.get(r.round) ?? fallbackLabel(r.round, r.raceName));
+  const xLabels = roundInfo.map((l) => l.short);
+  const xTitles = roundInfo.map((l) => l.title);
+  const xDetails = allRounds.map((r, i) => [roundInfo[i]!.detail, r.hasRace ? "" : "corrida ainda sem resultado"].filter(Boolean).join(" · "));
   const series = (get: (a: EntityAnalysis, i: number) => number | null, note?: (a: EntityAnalysis, i: number) => string | null): ChartSeries[] =>
     analyses.map((a, slot) => ({
       id: a.id,
@@ -228,6 +233,7 @@ export default async function HeadToHeadPage({ searchParams }: { searchParams: P
                   series={series((a, i) => a.rounds[i]!.cumulative)}
                   xLabels={xLabels}
                   xTitles={xTitles}
+                  xDetails={xDetails}
                 />
               </Card>
               <Card className="p-4 sm:p-6">
@@ -237,6 +243,7 @@ export default async function HeadToHeadPage({ searchParams }: { searchParams: P
                   series={series((a, i) => a.rounds[i]!.champPos)}
                   xLabels={xLabels}
                   xTitles={xTitles}
+                  xDetails={xDetails}
                   invert
                   format="position"
                 />
@@ -248,6 +255,7 @@ export default async function HeadToHeadPage({ searchParams }: { searchParams: P
                   series={series((a, i) => a.rounds[i]!.points)}
                   xLabels={xLabels}
                   xTitles={xTitles}
+                  xDetails={xDetails}
                 />
               </Card>
               <div className="grid gap-10">
@@ -265,6 +273,7 @@ export default async function HeadToHeadPage({ searchParams }: { searchParams: P
                     )}
                     xLabels={xLabels}
                     xTitles={xTitles}
+                    xDetails={xDetails}
                     invert
                     format="position"
                   />
@@ -276,6 +285,7 @@ export default async function HeadToHeadPage({ searchParams }: { searchParams: P
                     series={series((a, i) => a.rounds[i]!.qualiPos)}
                     xLabels={xLabels}
                     xTitles={xTitles}
+                    xDetails={xDetails}
                     invert
                     format="position"
                   />
@@ -289,6 +299,7 @@ export default async function HeadToHeadPage({ searchParams }: { searchParams: P
                     series={sprintSeries}
                     xLabels={sprintIdx.map((i) => xLabels[i]!)}
                     xTitles={sprintIdx.map((i) => xTitles[i]!)}
+                    xDetails={sprintIdx.map((i) => xDetails[i]!)}
                     invert
                     format="position"
                   />

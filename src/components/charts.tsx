@@ -26,8 +26,23 @@ const FORMATTERS: Record<ValueFormat, (v: number) => string> = {
 const COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
 const DASH = ["", "7 4", "2 4", "10 4 2 4"];
 const W = 760;
-const H = 300;
-const PAD = { l: 44, r: 120, t: 18, b: 34 };
+const H = 340;
+// Base maior: rótulos de etapa (país/cidade) inclinados para caberem todos.
+const PAD = { l: 66, r: 120, t: 18, b: 78 };
+
+function shortLabel(s: string) {
+  return s.length > 13 ? `${s.slice(0, 12)}…` : s;
+}
+
+function AxisLabel({ x, label }: { x: number; label: string }) {
+  const y = H - PAD.b + 14;
+  return (
+    <text x={x} y={y} transform={`rotate(-40 ${x} ${y})`} textAnchor="end" fontSize="11" fill="var(--text-faint)">
+      <title>{label}</title>
+      {shortLabel(label)}
+    </text>
+  );
+}
 
 function niceMax(v: number) {
   if (v <= 5) return 5;
@@ -52,7 +67,19 @@ function Legend({ series }: { series: ChartSeries[] }) {
   );
 }
 
-function DataTable({ series, xLabels, xTitles, format }: { series: ChartSeries[]; xLabels: string[]; xTitles: string[]; format: (v: number) => string }) {
+function DataTable({
+  series,
+  xLabels,
+  xTitles,
+  xDetails,
+  format,
+}: {
+  series: ChartSeries[];
+  xLabels: string[];
+  xTitles: string[];
+  xDetails?: string[];
+  format: (v: number) => string;
+}) {
   return (
     <details className="mt-2 text-sm">
       <summary className="cursor-pointer text-muted">Ver dados em tabela</summary>
@@ -72,7 +99,8 @@ function DataTable({ series, xLabels, xTitles, format }: { series: ChartSeries[]
             {xLabels.map((x, i) => (
               <tr key={x}>
                 <th scope="row" className="text-left normal-case tracking-normal text-fg">
-                  {x} <span className="text-faint">{xTitles[i]}</span>
+                  {xTitles[i] ?? x}
+                  {xDetails?.[i] && <span className="block text-xs font-normal text-faint">{xDetails[i]}</span>}
                 </th>
                 {series.map((s) => {
                   const v = s.values[i];
@@ -118,9 +146,11 @@ function Tooltip({
   idx,
   leftPct,
   title,
+  subtitle,
   series,
   format,
 }: {
+  subtitle?: string;
   idx: number;
   /** Posição horizontal do ponto em % da largura do gráfico. */
   leftPct: number;
@@ -135,7 +165,9 @@ function Tooltip({
       className="pointer-events-none absolute top-2 z-10 min-w-44 rounded border border-line-strong bg-elev px-3 py-2 text-xs shadow-xl"
       style={alignRight ? { right: `${100 - leftPct + 1}%` } : { left: `${leftPct + 1}%` }}
     >
-      <p className="mb-1 font-semibold text-fg">{title}</p>
+      <p className="font-semibold text-fg">{title}</p>
+      {subtitle && <p className="mb-1 text-[0.7rem] text-faint">{subtitle}</p>}
+      {!subtitle && <div className="mb-1" />}
       <ul className="space-y-0.5">
         {series.map((s) => {
           const v = s.values[idx];
@@ -164,6 +196,7 @@ export function TrendChart({
   series,
   xLabels,
   xTitles,
+  xDetails,
   invert = false,
   format: formatName = "number",
 }: {
@@ -172,6 +205,8 @@ export function TrendChart({
   series: ChartSeries[];
   xLabels: string[];
   xTitles: string[];
+  /** Linha extra no tooltip e na tabela (circuito, cidade, data). */
+  xDetails?: string[];
   invert?: boolean;
   format?: ValueFormat;
 }) {
@@ -207,7 +242,7 @@ export function TrendChart({
     .sort((a, b) => a.yy - b.yy);
   for (let k = 1; k < ends.length; k++) if (ends[k]!.yy - ends[k - 1]!.yy < 14) ends[k]!.yy = ends[k - 1]!.yy + 14;
 
-  const labelEvery = Math.ceil(n / 12);
+  const labelEvery = Math.ceil(n / 26); // todas as etapas de uma temporada cabem inclinadas
 
   return (
     <figure>
@@ -240,13 +275,7 @@ export function TrendChart({
               </text>
             </g>
           ))}
-          {xLabels.map((l, i) =>
-            i % labelEvery === 0 || i === n - 1 ? (
-              <text key={l} x={x(i)} y={H - 12} textAnchor="middle" fontSize="11" fill="var(--text-faint)">
-                {l}
-              </text>
-            ) : null,
-          )}
+          {xLabels.map((l, i) => (i % labelEvery === 0 || i === n - 1 ? <AxisLabel key={`${l}-${i}`} x={x(i)} label={l} /> : null))}
           {hover.idx !== null && <line x1={x(hover.idx)} x2={x(hover.idx)} y1={PAD.t} y2={H - PAD.b} stroke="var(--text-faint)" strokeDasharray="3 3" />}
           {series.map((s) => {
             let d = "";
@@ -288,13 +317,14 @@ export function TrendChart({
           <Tooltip
             idx={hover.idx}
             leftPct={(x(hover.idx) / W) * 100}
-            title={`${xLabels[hover.idx]} · ${xTitles[hover.idx] ?? ""}`}
+            title={xTitles[hover.idx] ?? xLabels[hover.idx] ?? ""}
+            subtitle={xDetails?.[hover.idx]}
             series={series}
             format={format}
           />
         )}
       </div>
-      <DataTable series={series} xLabels={xLabels} xTitles={xTitles} format={format} />
+      <DataTable series={series} xLabels={xLabels} xTitles={xTitles} xDetails={xDetails} format={format} />
     </figure>
   );
 }
@@ -306,6 +336,7 @@ export function RoundBars({
   series,
   xLabels,
   xTitles,
+  xDetails,
   format: formatName = "number",
 }: {
   title: string;
@@ -313,6 +344,8 @@ export function RoundBars({
   series: ChartSeries[];
   xLabels: string[];
   xTitles: string[];
+  /** Linha extra no tooltip e na tabela (circuito, cidade, data). */
+  xDetails?: string[];
   format?: ValueFormat;
 }) {
   const format = FORMATTERS[formatName];
@@ -332,7 +365,7 @@ export function RoundBars({
   const y = (v: number) => H - PAD.b - (v / yMax) * (H - PAD.t - PAD.b);
   const base = H - PAD.b;
   const ticks = [0, 0.2, 0.4, 0.6, 0.8, 1].map((f) => Math.round(yMax * f));
-  const labelEvery = Math.ceil(n / 12);
+  const labelEvery = Math.ceil(n / 26); // todas as etapas de uma temporada cabem inclinadas
   // Hover usa o mesmo mapeamento do gráfico de linhas: ajusta índice pelo centro das colunas.
   const onMove = (e: PointerEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -372,13 +405,7 @@ export function RoundBars({
             </g>
           ))}
           {hover.idx !== null && <rect x={PAD.l + slot * hover.idx} y={PAD.t} width={slot} height={base - PAD.t} fill="var(--text)" opacity="0.05" />}
-          {xLabels.map((l, i) =>
-            i % labelEvery === 0 || i === n - 1 ? (
-              <text key={l} x={cx(i)} y={H - 12} textAnchor="middle" fontSize="11" fill="var(--text-faint)">
-                {l}
-              </text>
-            ) : null,
-          )}
+          {xLabels.map((l, i) => (i % labelEvery === 0 || i === n - 1 ? <AxisLabel key={`${l}-${i}`} x={cx(i)} label={l} /> : null))}
           {series.map((s, si) =>
             s.values.map((v, i) => {
               if (!v) return null;
@@ -396,13 +423,14 @@ export function RoundBars({
           <Tooltip
             idx={hover.idx}
             leftPct={(cx(hover.idx) / W) * 100}
-            title={`${xLabels[hover.idx]} · ${xTitles[hover.idx] ?? ""}`}
+            title={xTitles[hover.idx] ?? xLabels[hover.idx] ?? ""}
+            subtitle={xDetails?.[hover.idx]}
             series={series}
             format={format}
           />
         )}
       </div>
-      <DataTable series={series} xLabels={xLabels} xTitles={xTitles} format={format} />
+      <DataTable series={series} xLabels={xLabels} xTitles={xTitles} xDetails={xDetails} format={format} />
     </figure>
   );
 }

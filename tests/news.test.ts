@@ -102,6 +102,10 @@ describe("política editorial", () => {
     expect(exclusionReason(sourceById("formula1")!, "Our Singapore Grand Prix Bet Builder picks made", "")).toMatch(/não-notícia/);
     expect(exclusionReason(fia, "INTERNATIONAL COURT OF APPEAL - NASCAR case", "Rally hearing")).toMatch(/escopo/);
     expect(exclusionReason(autosport, "Norris explains Singapore qualifying struggles", "")).toBeNull();
+    expect(exclusionReason(sourceById("formula1")!, "LIVE COVERAGE: Verstappen leads in Singapore Grand Prix", "")).toMatch(/não-notícia/);
+    const theRace = sourceById("the-race")!;
+    expect(exclusionReason(theRace, "Acosta and Marquez 'looked like donkeys' in strange MotoGP duel", "Ex-Ferrari engineer says")).toMatch(/escopo/);
+    expect(exclusionReason(theRace, "Why Ferrari's F1 upgrade worked", "")).toBeNull();
   });
 
   it("marca temas sensíveis", () => {

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { TrendChart, type ChartSeries } from "@/components/charts";
 import { Card, Container, ErrorState, PageHeader, SectionHeading, SourceNote } from "@/components/ui";
 import { analyzeEntity, championshipPositions, seasonRounds, type SeasonData } from "@/lib/f1/compare";
+import { fallbackLabel, roundLabels } from "@/lib/f1/round-labels";
 import { driverName, f1, load } from "@/lib/f1/service";
 
 export const revalidate = 900;
@@ -20,7 +21,11 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
 
   const [dsR, csR] = await Promise.all([load(f1.getDriverStandings(key)), load(f1.getConstructorStandings(key))]);
   const seasonNum = dsR.ok ? dsR.data.season : (season ?? thisYear);
-  const [racesR, sprintsR] = await Promise.all([load(f1.getSeasonResults(seasonNum, "race")), load(f1.getSeasonResults(seasonNum, "sprint"))]);
+  const [racesR, sprintsR, eventsR] = await Promise.all([
+    load(f1.getSeasonResults(seasonNum, "race")),
+    load(f1.getSeasonResults(seasonNum, "sprint")),
+    load(f1.getSchedule(seasonNum)),
+  ]);
   const data: SeasonData = { races: racesR.ok ? racesR.data : [], sprints: sprintsR.ok ? sprintsR.data : [], qualis: [] };
 
   // Etapas com corrida OU sprint publicada (num fim de semana Sprint, a sprint pontua antes da corrida).
@@ -33,8 +38,11 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
 
   const ds = dsR.ok ? dsR.data : null;
   const cs = csR.ok ? csR.data : null;
-  const xLabels = rounds.map((r) => `E${r.round}`);
-  const xTitles = rounds.map((r) => r.raceName.replace(" Grand Prix", "") + (r.hasRace ? "" : " (só sprint)"));
+  const labels = eventsR.ok ? roundLabels(eventsR.data) : new Map();
+  const roundInfo = rounds.map((r) => labels.get(r.round) ?? fallbackLabel(r.round, r.raceName));
+  const xLabels = roundInfo.map((l) => l.short);
+  const xTitles = roundInfo.map((l) => l.title);
+  const xDetails = rounds.map((r, i) => [roundInfo[i]!.detail, r.hasRace ? "" : "só a sprint tem resultado"].filter(Boolean).join(" · "));
   // Até 4 séries: limite da paleta categórica validada.
   const driverSeries: ChartSeries[] = (ds?.rows.slice(0, 4) ?? [])
     .map((r, slot) => ({
@@ -176,6 +184,7 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
                   series={driverSeries}
                   xLabels={xLabels}
                   xTitles={xTitles}
+                  xDetails={xDetails}
                 />
               </Card>
               <Card className="p-4 sm:p-6">
@@ -185,6 +194,7 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
                   series={teamSeries}
                   xLabels={xLabels}
                   xTitles={xTitles}
+                  xDetails={xDetails}
                 />
               </Card>
             </div>
