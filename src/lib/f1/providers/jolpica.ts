@@ -24,6 +24,9 @@ import type {
 
 const BASE = "https://api.jolpi.ca/ergast/f1";
 
+/** Tag de cache de todos os dados esportivos: permite atualização imediata pelo painel. */
+export const F1_CACHE_TAG = "f1-data";
+
 export const JOLPICA_INFO: DataSourceInfo = {
   id: "jolpica",
   name: "Jolpica-F1 API (sucessora da Ergast)",
@@ -93,7 +96,7 @@ async function getJson(path: string, opts: FetchOpts): Promise<unknown> {
   const url = `${BASE}${path}`;
   const res = await fetch(url, {
     headers: { Accept: "application/json", "User-Agent": "ApexGrid/0.1 (+https://github.com/)" },
-    next: { revalidate: opts.revalidate },
+    next: { revalidate: opts.revalidate, tags: [F1_CACHE_TAG] },
     signal: AbortSignal.timeout(15_000),
   } as RequestInit);
   if (!res.ok) throw new Error(`Jolpica ${res.status} em ${path}`);

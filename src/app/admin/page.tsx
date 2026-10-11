@@ -7,7 +7,7 @@ import { env } from "@/lib/env";
 import { createEditorialAI } from "@/lib/news/ai-factory";
 import { sourceById } from "@/lib/news/sources";
 import { ARTICLE_STATUS_LABEL, type ArticleStatus } from "@/lib/news/states";
-import { logoutAction, runCycleAction, toggleSourceAction } from "./actions";
+import { logoutAction, refreshSportsDataAction, runCycleAction, toggleSourceAction } from "./actions";
 
 export const metadata: Metadata = { title: "Painel", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -111,6 +111,10 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
           ) : (
             <p className="mt-2 text-xs text-faint">Somente administradores.</p>
           )}
+          <form action={refreshSportsDataAction} className="mt-3 border-t border-line pt-3">
+            <button className="rounded border border-line px-3 py-1.5 text-sm">Atualizar dados esportivos agora</button>
+            <p className="mt-1 text-[0.7rem] text-faint">Resultados oficiais saem na fonte algumas horas após a corrida.</p>
+          </form>
         </Card>
       </div>
 

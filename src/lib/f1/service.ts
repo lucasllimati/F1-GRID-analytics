@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { JolpicaProvider } from "./providers/jolpica";
+import { F1_CACHE_TAG, JolpicaProvider } from "./providers/jolpica";
 import { DEFAULT_ASSUMPTIONS, runChampionshipModel, type ModelOutput } from "./probability";
 import type { F1DataProvider, RaceEvent } from "./types";
 
@@ -49,4 +49,5 @@ async function computeModel(season: number): Promise<ModelOutput> {
 export const getChampionshipModel = (season: number) =>
   unstable_cache(() => computeModel(season), ["championship-model", String(season), DEFAULT_ASSUMPTIONS.seed.toString()], {
     revalidate: 3600,
+    tags: [F1_CACHE_TAG],
   })();

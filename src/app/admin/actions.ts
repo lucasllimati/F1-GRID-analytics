@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -11,6 +11,7 @@ import { verifyPassword } from "@/lib/auth/password";
 import { rateLimit, resetRateLimit } from "@/lib/auth/rate-limit";
 import { createSessionToken, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/auth/session";
 import { db } from "@/lib/db";
+import { F1_CACHE_TAG } from "@/lib/f1/providers/jolpica";
 import { approveAndPublish, editArticle, EditorialError, reject, reopen, retract } from "@/lib/news/editorial";
 import { LOCK_MINUTES } from "@/lib/news/pipeline";
 import { runConfiguredCycle } from "@/lib/news/run";
@@ -84,6 +85,17 @@ export async function runCycleAction(formData: FormData) {
     }
   });
   back("/admin", "ok", "Ciclo iniciado em segundo plano. Recarregue a página em alguns minutos e veja o resultado em \"Execuções recentes\" e na fila de revisão.");
+}
+
+export async function refreshSportsDataAction() {
+  const user = await requireUser();
+  // Limite simples: evita estourar o limite público da Jolpica (~500 req/h) com cliques repetidos.
+  const limit = rateLimit(`f1-refresh:${user.id}`, 6, 10 * 60_000);
+  if (!limit.ok) back("/admin", "erro", `Aguarde ${Math.ceil(limit.retryAfterSec / 60)} min para atualizar de novo (limite da fonte de dados).`);
+  revalidateTag(F1_CACHE_TAG);
+  revalidatePath("/", "layout");
+  await audit(`user:${user.id}`, "f1.cache_refreshed", "f1_data", null);
+  back("/admin", "ok", "Dados esportivos atualizados: as próximas visitas buscam calendário, resultados, classificação e probabilidades direto da fonte.");
 }
 
 export async function toggleSourceAction(formData: FormData) {
