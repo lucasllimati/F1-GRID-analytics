@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { logger } from "../../log";
+import { CircuitBreaker, RateLimiter, RetryableHttpError, withRetry } from "../../net/resilient";
 import { circuitMeta } from "../circuits";
 import { deriveEventStatus, sortSessions } from "../schedule";
 import type {
@@ -92,15 +94,47 @@ const zQuali = z.object({
 
 type FetchOpts = { revalidate: number };
 
+const log = logger("f1.jolpica");
+/** Disjuntor compartilhado: após 5 falhas seguidas, pausa chamadas por 60 s (protege a fonte e o site). */
+export const jolpicaBreaker = new CircuitBreaker("Jolpica", 5, 60_000);
+/** Limite público da Jolpica: ~4 req/s em rajada. Mantemos 2 simultâneas e ≥ 300 ms entre inícios. */
+const jolpicaLimiter = new RateLimiter(2, 300);
+
 async function getJson(path: string, opts: FetchOpts): Promise<unknown> {
   const url = `${BASE}${path}`;
-  const res = await fetch(url, {
-    headers: { Accept: "application/json", "User-Agent": "ApexGrid/0.1 (+https://github.com/)" },
-    next: { revalidate: opts.revalidate, tags: [F1_CACHE_TAG] },
-    signal: AbortSignal.timeout(15_000),
-  } as RequestInit);
-  if (!res.ok) throw new Error(`Jolpica ${res.status} em ${path}`);
-  return res.json();
+  jolpicaBreaker.guard();
+  const started = Date.now();
+  try {
+    const json = await withRetry(
+      async () => {
+        const res = await jolpicaLimiter.run(() =>
+          fetch(url, {
+            headers: { Accept: "application/json", "User-Agent": "ApexGrid/0.1 (+https://github.com/)" },
+            next: { revalidate: opts.revalidate, tags: [F1_CACHE_TAG] },
+            signal: AbortSignal.timeout(15_000),
+          } as RequestInit),
+        );
+        if (!res.ok) {
+          const ra = Number(res.headers.get("retry-after"));
+          throw new RetryableHttpError(res.status, `Jolpica ${res.status} em ${path}`, Number.isFinite(ra) && ra > 0 ? ra * 1000 : null);
+        }
+        return res.json() as Promise<unknown>;
+      },
+      {
+        retries: 3,
+        baseDelayMs: 1_000,
+        maxDelayMs: 4_000,
+        onRetry: (attempt, err, delayMs) =>
+          log.warn("nova tentativa", { path, attempt, delayMs, error: err instanceof Error ? err.message : String(err) }),
+      },
+    );
+    jolpicaBreaker.success();
+    return json;
+  } catch (err) {
+    jolpicaBreaker.failure();
+    log.error("falha ao consultar a fonte", { path, durationMs: Date.now() - started, error: err, breaker: jolpicaBreaker.snapshot() });
+    throw err;
+  }
 }
 
 function mrData(json: unknown): Record<string, unknown> {

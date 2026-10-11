@@ -175,6 +175,8 @@ model IngestionRun {
   status     String // running | ok | partial | error
   stats      String    @default("{}") // JSON
   error      String?
+  // Progresso por etapa (JSON) enquanto status = running; ver src/lib/news/progress.ts
+  progress   String    @default("{}")
   startedAt  DateTime  @default(now())
   finishedAt DateTime?
 

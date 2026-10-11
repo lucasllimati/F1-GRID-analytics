@@ -142,6 +142,17 @@ describe("pipeline da redação (integração)", () => {
     const evidence = await db.feedItem.count({ where: { evidenceText: { not: null } } });
     expect(evidence).toBeGreaterThan(0);
     expect(await db.agentRun.count()).toBe(4);
+
+    // Progresso final gravado por etapa
+    const run = await db.ingestionRun.findFirst({ orderBy: { startedAt: "desc" } });
+    const progress = JSON.parse(run!.progress);
+    expect(progress.label).toBe("Buscar e escrever notícias");
+    const byKey = Object.fromEntries(progress.phases.map((p: { key: string }) => [p.key, p]));
+    expect(byKey.sources).toMatchObject({ status: "done", done: 7, total: 7 });
+    expect(byKey.cluster).toMatchObject({ status: "done" });
+    expect(byKey.writing.status).toBe("done");
+    expect(byKey.writing.done).toBe(byKey.writing.total);
+    expect(byKey.writing.total).toBe(2 * 4); // 2 pautas × 4 passos
     expect(stats.aiCostUsd).toBeCloseTo(0.046, 5);
   });
 
@@ -185,6 +196,10 @@ describe("pipeline da redação (integração)", () => {
     );
     const { stats } = await runNewsCycle({ db, ...base, ingestOnly: true });
     expect(Object.values(stats.sources).every((s) => !s.ok)).toBe(true);
+    const failedRun = await db.ingestionRun.findFirst({ orderBy: { startedAt: "desc" } });
+    const phases = JSON.parse(failedRun!.progress).phases;
+    expect(phases.find((p: { key: string }) => p.key === "sources").status).toBe("error");
+    expect(phases.find((p: { key: string }) => p.key === "writing").status).toBe("skipped");
     const run = await db.ingestionRun.findFirst({ orderBy: { startedAt: "desc" } });
     expect(run?.status).toBe("partial");
   });

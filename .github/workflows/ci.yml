@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: file:./ci.db
+      # Segredos fictícios só para CI (nunca usados em produção).
+      SESSION_SECRET: ci-only-session-secret-not-for-production-000000
+      CRON_SECRET: ci-only-cron-secret-000000000000
+      NEWS_AI_PROVIDER: gemini
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências (determinístico)
+        run: npm ci
+
+      - name: Prisma — validar schema e gerar cliente
+        run: npx prisma validate && npx prisma generate
+
+      - name: Verificação de tipos
+        run: npm run lint
+
+      - name: Testes (unitários + integração do pipeline com SQLite)
+        run: npm test
+
+      - name: Auditoria de dependências (bloqueia só em crítico; riscos aceitos em docs/SECURITY.md)
+        run: npm audit --omit=dev --audit-level=critical
+
+      - name: Build de produção
+        run: npm run build
+
+      - name: Banco de CI
+        run: npx prisma migrate deploy
+
+      - name: Teste de fumaça (servidor de produção local)
+        # Depende da API pública Jolpica: falha de rede externa não bloqueia o merge, mas fica visível.
+        continue-on-error: true
+        run: |
+          npm start -- -p 3000 > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:3000/api/health > /dev/null && break; sleep 2; done
+          npm run smoke
+      - name: Logs do servidor (se o smoke falhar)
+        if: failure()
+        run: tail -100 server.log || true

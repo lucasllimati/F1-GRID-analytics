@@ -92,7 +92,7 @@ export default async function HomePage() {
                   {upcoming.name}
                 </h1>
                 <p className="mt-4 text-lg text-muted">
-                  <span aria-hidden="true">{upcoming.flag}</span> {upcoming.circuitName} · {upcoming.locality}, {upcoming.countryPt}
+                  {upcoming.circuitName} · {upcoming.locality}, {upcoming.countryPt}
                 </p>
                 {start && (
                   <p className="mt-1 text-sm text-faint">

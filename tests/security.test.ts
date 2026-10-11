@@ -77,3 +77,14 @@ describe("renderização de artigo (XSS)", () => {
     expect(html).toContain("<strong>item</strong>");
   });
 });
+
+describe("navegação", () => {
+  it("marca a seção atual inclusive em subrotas", async () => {
+    const { isActive } = await import("@/components/nav-links");
+    const cal = { href: "/calendar", label: "Calendário" };
+    expect(isActive("/calendar", cal)).toBe(true);
+    expect(isActive("/calendar/2026/17", cal)).toBe(true);
+    expect(isActive("/calendario-falso", cal)).toBe(false);
+    expect(isActive("/news", cal)).toBe(false);
+  });
+});

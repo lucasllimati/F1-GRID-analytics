@@ -32,12 +32,14 @@ Comece sempre em `NEWS_PUBLISH_MODE="semi"` (tudo vai para revisão em `/admin`)
 | Comando | O que faz |
 |---|---|
 | `npm run dev` / `build` / `start` | Next.js |
-| `npm test` | 104 testes (fusos/DST, pontuação, modelo, RSS, deduplicação, política editorial, segurança, pipeline integrado) |
+| `npm test` | 116 testes (fusos/DST, pontuação, modelo, RSS, deduplicação, política editorial, segurança, pipeline integrado) |
 | `npm run lint` | checagem de tipos |
 | `npm run news:ingest` | monitora as 7 fontes e agrupa pautas |
 | `npm run news:cycle` | ciclo completo (monitorar → redigir → checar → publicar/revisar) |
 | `npm run admin:create` | cria/atualiza usuário da redação |
 | `npm run ai:check` | testa a conexão com a IA configurada |
+| `npm run data:check` | valida a consistência dos dados esportivos da temporada contra a fonte |
+| `npm run smoke` | teste de fumaça das rotas (use `SMOKE_BASE_URL` para produção) |
 | `npm run db:migrate` / `db:deploy` | migrations |
 
 ## Páginas
@@ -52,6 +54,10 @@ Comece sempre em `NEWS_PUBLISH_MODE="semi"` (tudo vai para revisão em `/admin`)
 - [Modelo de probabilidade](docs/PROBABILITY.md)
 - [Segurança](docs/SECURITY.md)
 - [Deploy](docs/DEPLOY.md)
+- [Runbook de operação](docs/RUNBOOK.md)
+- [Diagnóstico técnico, riscos residuais e próximas fases](docs/DIAGNOSTICO.md)
+
+Monitoramento: `GET /api/health` (para um monitor de uptime). CI: `.github/workflows/ci.yml`.
 
 ## Limitações atuais
 

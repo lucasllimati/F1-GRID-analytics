@@ -14,6 +14,8 @@ Verificado em 2026-10-10.
 
 Precedência quando houver mais de uma fonte (futuro): documento oficial da FIA > fonte oficial F1 > API licenciada > API comunitária. Divergências devem ser preservadas como evidência.
 
+**Como consumimos a Jolpica (resiliência)**: no máximo 2 requisições simultâneas e ≥ 300 ms entre inícios (abaixo do limite público); timeout de 15 s; até 3 novas tentativas com backoff exponencial + jitter em 429/5xx/rede, respeitando `Retry-After`; disjuntor que pausa as consultas por 60 s após 5 falhas seguidas. Resultados normalizados ficam em cache por 10–30 min (invalidáveis no painel). A consistência é verificada por `npm run data:check` e exibida no painel.
+
 **Limitações conhecidas da Jolpica**: o grid de largada só aparece junto com o resultado da corrida; não há estado ao vivo; a classificação publicada pode atrasar algumas horas após a corrida.
 
 ## Feeds de notícias

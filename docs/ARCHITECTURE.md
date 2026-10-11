@@ -123,4 +123,4 @@ Monte Carlo com Plackett-Luce ponderado por recência, choque de equipe comparti
 - [x] Pipeline de notícias executado contra os **feeds reais** (7/7 fontes OK, 164 itens, 91 pautas) e testado ponta a ponta com IA simulada em SQLite real.
 - [ ] Redação com a API real do Claude — **não validada nesta máquina** (sem `ANTHROPIC_API_KEY`). Ver README → "Validar a redação com IA".
 - [x] Admin com login, sessão httpOnly, RBAC, rate limit e proteção CSRF verificados contra o servidor de produção local.
-- [x] `npm run build`, `tsc` e 89 testes passando.
+- [x] `npm run build`, `tsc` e 116 testes passando (ver docs/DIAGNOSTICO.md para a auditoria de produção).

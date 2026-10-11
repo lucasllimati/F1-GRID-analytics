@@ -107,7 +107,7 @@ export default async function EventPage({ params, searchParams }: { params: Prom
             {hasSprint && <Badge tone="warn">Fim de semana Sprint</Badge>}
           </div>
           <h1 className="font-display text-4xl font-extrabold uppercase italic tracking-tight sm:text-6xl">
-            <span aria-hidden="true">{event.flag}</span> {event.name}
+            {event.name}
           </h1>
           <p className="mt-2 text-muted">
             {event.circuitName} · {event.locality}, {event.countryPt}

@@ -5,6 +5,7 @@ import { clusterItems, CLUSTER_WINDOW_HOURS } from "./cluster";
 import { extractArticleText } from "./extract";
 import { decidePublication, exclusionReason, sensitivityReasons, storyEligible, type FactCheckSummary } from "./policy";
 import type { PromptSource } from "./prompts";
+import { ProgressReporter, WRITING_STEPS } from "./progress";
 import { parseFeed } from "./rss";
 import { allowedHosts, NEWS_SOURCES, sourceById, type SourceDef } from "./sources";
 import type { PublishMode } from "./states";
@@ -74,20 +75,28 @@ export async function runNewsCycle(opts: CycleOptions): Promise<{ runId: string;
     aiCostUsd: 0,
   };
 
+  const pr = new ProgressReporter(db, run.id);
+  pr.setLabel(opts.ingestOnly ? "Só buscar manchetes" : "Buscar e escrever notícias");
   try {
     await ensureSources(db);
-    await ingestFeeds(db, stats, now, log);
+    await ingestFeeds(db, stats, now, log, pr);
+    pr.update("cluster", { status: "running", total: 1, detail: "comparando manchetes de veículos diferentes" });
     await clusterNewItems(db, stats, now);
+    pr.update("cluster", { status: "done", done: 1, detail: `${stats.storiesCreated} pauta(s) nova(s), ${stats.storiesUpdated} atualizada(s)` });
 
     if (opts.ingestOnly) {
       stats.note = "Somente monitoramento (ingestOnly).";
+      pr.update("writing", { status: "skipped", detail: "só buscar manchetes: nada é escrito" });
     } else if (opts.mode === "manual") {
       stats.note = "Modo manual: pautas agrupadas; nenhuma redação automática.";
+      pr.update("writing", { status: "skipped", detail: "modo manual" });
     } else if (!opts.ai) {
       stats.note = `${opts.aiUnavailableReason ?? "IA não configurada"}: pautas agrupadas; redação automática desativada.`;
+      pr.update("writing", { status: "skipped", detail: opts.aiUnavailableReason ?? "IA não configurada" });
     } else {
-      await writeStories(db, opts.ai, opts, stats, now, log);
+      await writeStories(db, opts.ai, opts, stats, now, log, pr);
     }
+    await pr.finish();
 
     const anySourceFailed = Object.values(stats.sources).some((s) => !s.ok);
     await db.ingestionRun.update({
@@ -97,6 +106,8 @@ export async function runNewsCycle(opts: CycleOptions): Promise<{ runId: string;
     return { runId: run.id, stats };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    for (const ph of pr.snapshot.phases) if (ph.status === "running") pr.update(ph.key, { status: "error", detail: message.slice(0, 200) });
+    await pr.finish();
     await db.ingestionRun.update({
       where: { id: run.id },
       data: { status: "error", error: message.slice(0, 2000), stats: JSON.stringify(stats), finishedAt: new Date() },
@@ -116,8 +127,9 @@ async function ensureSources(db: PrismaClient) {
   }
 }
 
-async function ingestFeeds(db: PrismaClient, stats: CycleStats, now: () => Date, log: (m: string) => void) {
+async function ingestFeeds(db: PrismaClient, stats: CycleStats, now: () => Date, log: (m: string) => void, pr: ProgressReporter) {
   const enabled = await db.newsSource.findMany({ where: { enabled: true } });
+  pr.update("sources", { status: "running", total: enabled.length, done: 0, detail: `lendo ${enabled.length} site(s)` });
   const hosts = allowedHosts();
   const cutoff = new Date(now().getTime() - ITEM_MAX_AGE_DAYS * 86_400_000);
 
@@ -165,6 +177,7 @@ async function ingestFeeds(db: PrismaClient, stats: CycleStats, now: () => Date,
         }
         await db.newsSource.update({ where: { id: row.id }, data: { lastFetchedAt: new Date(), lastStatus: "ok", lastError: null } });
         log(`[fonte] ${row.id}: ${st.items} itens, ${st.created} novos`);
+        pr.increment("sources", `${def.name}: ${st.created} nova(s)`);
       } catch (err) {
         st.ok = false;
         st.error = err instanceof Error ? err.message : String(err);
@@ -173,9 +186,15 @@ async function ingestFeeds(db: PrismaClient, stats: CycleStats, now: () => Date,
           data: { lastFetchedAt: new Date(), lastStatus: "error", lastError: st.error.slice(0, 500) },
         });
         log(`[fonte] ${row.id}: ERRO ${st.error}`);
+        pr.increment("sources", `${def.name}: erro`);
       }
     }),
   );
+  const failed = Object.values(stats.sources).filter((x) => !x.ok).length;
+  pr.update("sources", {
+    status: failed > 0 && failed === enabled.length ? "error" : "done",
+    detail: `${stats.newItems} manchete(s) nova(s)${failed ? ` · ${failed} fonte(s) com erro` : ""}`,
+  });
 }
 
 async function clusterNewItems(db: PrismaClient, stats: CycleStats, now: () => Date) {
@@ -286,12 +305,14 @@ async function writeStories(
   stats: CycleStats,
   now: () => Date,
   log: (m: string) => void,
+  pr: ProgressReporter,
 ) {
   const dayAgo = new Date(now().getTime() - 86_400_000);
   const generatedToday = await db.article.count({ where: { origin: "ai", createdAt: { gt: dayAgo } } });
   const budget = Math.max(0, Math.min(opts.maxPerRun, opts.maxPerDay - generatedToday));
   if (budget === 0) {
     stats.note = "Limite de artigos por ciclo/dia atingido.";
+    pr.update("writing", { status: "skipped", detail: "limite de matérias por ciclo/dia atingido" });
     return;
   }
 
@@ -314,17 +335,32 @@ async function writeStories(
     .sort((a, b) => b.groups - a.groups || Number(b.official) - Number(a.official) || b.s.lastSeenAt.getTime() - a.s.lastSeenAt.getTime())
     .slice(0, budget);
 
-  for (const { s } of ranked) {
+  const steps = WRITING_STEPS.length;
+  if (ranked.length === 0) {
+    pr.update("writing", { status: "done", total: 0, detail: "nenhuma pauta elegível agora (precisa de fonte oficial ou 2+ veículos, com 30 min)" });
+    return;
+  }
+  pr.update("writing", { status: "running", total: ranked.length * steps, done: 0, detail: `${ranked.length} pauta(s) selecionada(s)` });
+  for (const [idx, { s }] of ranked.entries()) {
+    const title = (s.items[0]?.title ?? "pauta").slice(0, 90);
+    const step = (i: number) =>
+      pr.update("writing", { done: idx * steps + i, detail: `Matéria ${idx + 1} de ${ranked.length} · ${WRITING_STEPS[i] ?? ""}: ${title}` });
     await db.story.update({ where: { id: s.id }, data: { status: "queued" } });
     try {
-      await processStory(db, ai, opts, s.id, s.items, stats, now, log);
+      await processStory(db, ai, opts, s.id, s.items, stats, now, log, step);
     } catch (err) {
       stats.failed++;
       const message = err instanceof Error ? err.message : String(err);
       await db.story.update({ where: { id: s.id }, data: { status: "failed", skipReason: message.slice(0, 500) } });
       log(`[pauta] ${s.id}: FALHA ${message}`);
+    } finally {
+      pr.update("writing", { done: (idx + 1) * steps });
     }
   }
+  pr.update("writing", {
+    status: "done",
+    detail: `${stats.drafted} redigida(s) · ${stats.sentToReview} para revisão · ${stats.published} publicada(s)${stats.failed ? ` · ${stats.failed} falha(s)` : ""}`,
+  });
 }
 
 function sanitizeBody(body: string): string {
@@ -355,7 +391,9 @@ async function processStory(
   stats: CycleStats,
   now: () => Date,
   log: (m: string) => void,
+  step: (i: number) => void = () => {},
 ) {
+  step(0); // apuração
   const picked = pickItems(items);
   const promptSources: (PromptSource & { item: ItemWithSource; def: SourceDef })[] = [];
   for (const [idx, p] of picked.entries()) {
@@ -375,6 +413,7 @@ async function processStory(
   }
 
   // ── Redator ──
+  step(1); // redação
   const written = await ai.write(promptSources);
   await recordAgentRun(db, "writer", written, storyId, null, stats);
   if (!written.ok) {
@@ -428,6 +467,7 @@ async function processStory(
   stats.drafted++;
 
   // ── Verificador de fatos ──
+  step(2); // checagem de fatos
   const checked = await ai.factCheck(usedSources, { headline, dek, body });
   await recordAgentRun(db, "fact_checker", checked, storyId, article.id, stats);
 
@@ -487,6 +527,7 @@ async function processStory(
 
   const dayAgo = new Date(now().getTime() - 86_400_000);
   const publishedToday = await db.article.count({ where: { origin: "ai", approvedById: null, publishedAt: { gt: dayAgo } } });
+  step(3); // decisão
   const decision = decidePublication({
     mode: opts.mode,
     sources: usedSources.map((s) => s.def),

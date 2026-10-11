@@ -28,6 +28,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Permite build de verificação (CI/local) sem conflitar com um `next dev` aberto: NEXT_DIST_DIR=.next-ci
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   reactStrictMode: true,
   serverExternalPackages: ["@prisma/client"],

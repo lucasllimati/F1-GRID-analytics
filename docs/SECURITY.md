@@ -14,7 +14,20 @@
 | Segredos | Só em variáveis de ambiente lidas no servidor; `.env` no `.gitignore` | `env.ts` |
 | Custos de IA | limites por ciclo e por dia; custo por execução registrado | `pipeline.ts` |
 | CSV injection | células iniciadas por `= + - @` são prefixadas | `results-table.tsx` |
-| Auditoria | login, falhas de login, ações editoriais, publicação automática, operações de fonte | `AuditLog` |
+| Auditoria | login, falhas de login, ações editoriais, publicação automática, operações de fonte, atualização manual de dados | `AuditLog` |
+| Sessão no cabeçalho | `/api/admin/session` revalida assinatura, expiração e usuário ativo; renovação deslizante (8 h); cookie nunca exposto ao JS | `api/admin/session` |
+| Logs | JSON estruturado; chaves com password/secret/token/authorization/cookie/api key/session são mascaradas | `src/lib/log.ts` |
+| Abuso de API externa | Limitador (2 simultâneas, ≥300 ms), backoff com jitter, disjuntor | `src/lib/net/resilient.ts` |
+| Health check | `/api/health` expõe só estados agregados (sem erros internos) | `api/health` |
+
+## Dependências (npm audit, 2026-10-11)
+
+| Pacote | Situação |
+|---|---|
+| `postcss` (via Next 15) | **Corrigido** por `overrides` → `^8.5.29` |
+| `deepmerge-ts` (via `@prisma/config`) | **Risco aceito**: só processa a configuração local do Prisma (entrada confiável); a correção automática rebaixaria o Prisma. Reavaliar no upgrade do Prisma. |
+
+O CI bloqueia o merge em vulnerabilidades **críticas** (`npm audit --audit-level=critical`).
 
 ## Pendências para produção
 

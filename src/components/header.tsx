@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { AdminStatus } from "./admin-status";
 import { Logo } from "./logo";
+import { NavLinks, type NavItem } from "./nav-links";
 import { ThemeToggle } from "./theme-toggle";
 import { TimezonePicker } from "./timezone";
 
-export const NAV = [
+export const NAV: NavItem[] = [
   { href: "/race-center", label: "Race Center" },
   { href: "/calendar", label: "Calendário" },
   { href: "/results", label: "Resultados" },
@@ -22,13 +22,7 @@ export function Header() {
         <Logo />
         <nav aria-label="Principal" className="hidden flex-1 lg:block">
           <ul className="flex items-center gap-1">
-            {NAV.map((n) => (
-              <li key={n.href}>
-                <Link href={n.href} className="rounded px-3 py-2 text-sm font-medium text-muted hover:bg-elev-2 hover:text-fg">
-                  {n.label}
-                </Link>
-              </li>
-            ))}
+            <NavLinks items={NAV} variant="desktop" />
           </ul>
         </nav>
         <div className="ml-auto flex items-center gap-2">
@@ -39,13 +33,7 @@ export function Header() {
       </div>
       <nav aria-label="Principal (móvel)" className="border-t border-line lg:hidden">
         <ul className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-2 py-1.5">
-          {NAV.map((n) => (
-            <li key={n.href} className="shrink-0">
-              <Link href={n.href} className="block rounded px-3 py-1.5 text-sm text-muted hover:text-fg">
-                {n.label}
-              </Link>
-            </li>
-          ))}
+          <NavLinks items={NAV} variant="mobile" />
         </ul>
       </nav>
     </header>

@@ -176,7 +176,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Link href={`/calendar/${e.season}/${e.round}`} className="font-display text-xl font-bold uppercase hover:text-accent">
-                        <span aria-hidden="true">{e.flag}</span> {e.name}
+                        {e.name}
                       </Link>
                       <Badge tone={statusTone(e.status)}>{EVENT_STATUS_LABEL[e.status]}</Badge>
                       {e.format === "sprint" && <Badge tone="warn">Sprint</Badge>}
@@ -229,7 +229,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                             {raceSession(e)?.date.slice(8, 10)}
                           </span>
                           <Link href={`/calendar/${e.season}/${e.round}`} className="text-sm hover:text-accent">
-                            <span aria-hidden="true">{e.flag}</span> {e.name}
+                            {e.name}
                             <span className="block text-xs text-faint">{EVENT_STATUS_LABEL[e.status]}</span>
                           </Link>
                         </li>

@@ -15,7 +15,9 @@
     "admin:create": "tsx scripts/create-admin.ts",
     "news:cycle": "tsx scripts/news-cycle.ts",
     "news:ingest": "tsx scripts/news-cycle.ts --ingest-only",
-    "ai:check": "tsx scripts/ai-check.ts"
+    "ai:check": "tsx scripts/ai-check.ts",
+    "data:check": "tsx scripts/data-check.ts",
+    "smoke": "tsx scripts/smoke.ts"
   },
   "engines": {
     "node": ">=20.9"
@@ -46,5 +48,10 @@
     "@prisma/engines@6.19.3": true,
     "esbuild@0.28.2": true,
     "prisma@6.19.3": true
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.29"
+    }
   }
 }
