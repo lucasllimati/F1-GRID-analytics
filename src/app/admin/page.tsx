@@ -38,6 +38,25 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
     }),
     db.agentRun.findMany({ where: { status: { not: "ok" } }, orderBy: { startedAt: "desc" }, take: 5 }),
   ]);
+  const lastRefresh = await db.auditLog.findFirst({ where: { action: "f1.cache_refreshed" }, orderBy: { createdAt: "desc" } });
+  type Run = (typeof runs)[number];
+  const parseStats = (r: Run) =>
+    JSON.parse(r.stats) as { note?: string; newItems?: number; drafted?: number; sentToReview?: number; published?: number };
+  const isIngestOnly = (r: Run) => (parseStats(r).note ?? "").startsWith("Somente monitoramento");
+  const lastFull = runs.find((r) => !isIngestOnly(r));
+  const lastIngest = runs.find((r) => isIngestOnly(r));
+  const running = runs.find((r) => r.status === "running");
+  const ago = (d: Date) => {
+    const min = Math.round((Date.now() - d.getTime()) / 60_000);
+    return min < 1 ? "agora há pouco" : min < 60 ? `há ${min} min` : min < 1440 ? `há ${Math.round(min / 60)} h` : `há ${Math.round(min / 1440)} dia(s)`;
+  };
+  const runSummary = (r?: Run) => {
+    if (!r) return "nunca executado";
+    if (r.status === "running") return `rodando agora (iniciado ${ago(r.startedAt)})`;
+    const st = parseStats(r);
+    const writing = isIngestOnly(r) ? "" : ` · ${st.drafted ?? 0} redigidas · ${st.sentToReview ?? 0} para revisão`;
+    return `${ago(r.startedAt)} · ${st.newItems ?? 0} manchetes novas${writing}`;
+  };
 
   return (
     <Container className="py-10">
@@ -72,10 +91,15 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
         </p>
       )}
 
-      <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-10 grid gap-4 sm:grid-cols-3">
         <Card className="p-4">
           <p className="text-xs uppercase tracking-widest text-muted">Aguardando revisão</p>
           <p className="font-display text-4xl font-bold">{pending.length}</p>
+          {pending.length > 0 && (
+            <a href="#fila" className="text-xs text-accent hover:underline">
+              Ir para a fila ↓
+            </a>
+          )}
         </Card>
         <Card className="p-4">
           <p className="text-xs uppercase tracking-widest text-muted">Artigos por estado</p>
@@ -94,32 +118,128 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
           <p className="text-xs text-faint">
             24h · {(cost24._sum.inputTokens ?? 0).toLocaleString("pt-BR")} tokens in / {(cost24._sum.outputTokens ?? 0).toLocaleString("pt-BR")} out ·
             30 dias: US$ {(cost30._sum.costUsd ?? 0).toFixed(2)}
+            {aiSel.provider === "gemini" && " · plano gratuito do Gemini: custo zero, com limite de uso"}
           </p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs uppercase tracking-widest text-muted">Executar ciclo</p>
-          {user.role === "admin" ? (
-            <div className="mt-2 flex flex-wrap gap-2">
-              <form action={runCycleAction}>
-                <button className="rounded bg-accent px-3 py-1.5 text-sm font-semibold text-white">Ciclo completo</button>
-              </form>
-              <form action={runCycleAction}>
-                <input type="hidden" name="ingestOnly" value="1" />
-                <button className="rounded border border-line px-3 py-1.5 text-sm">Só monitorar</button>
-              </form>
-            </div>
-          ) : (
-            <p className="mt-2 text-xs text-faint">Somente administradores.</p>
-          )}
-          <form action={refreshSportsDataAction} className="mt-3 border-t border-line pt-3">
-            <button className="rounded border border-line px-3 py-1.5 text-sm">Atualizar dados esportivos agora</button>
-            <p className="mt-1 text-[0.7rem] text-faint">Resultados oficiais saem na fonte algumas horas após a corrida.</p>
-          </form>
         </Card>
       </div>
 
-      <section className="mb-12">
-        <SectionHeading title="Fila de revisão" />
+      <section className="mb-12" aria-labelledby="ops">
+        <SectionHeading id="ops" title="Operações" kicker="O que cada botão faz" />
+        {running && (
+          <p role="status" className="mb-4 rounded border border-info/50 p-3 text-sm">
+            <strong className="text-info">Há um ciclo rodando agora</strong> (iniciado {ago(running.startedAt)}). Você pode continuar revisando e
+            aprovando matérias; recarregue a página em alguns minutos para ver o resultado em &quot;Execuções recentes&quot;.
+          </p>
+        )}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="flex flex-col p-5">
+            <h3 className="mb-2 font-display text-xl font-bold uppercase">1 · Buscar e escrever notícias</h3>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              <Badge tone="warn">Usa IA</Badge>
+              <Badge>1 a 5 min · em segundo plano</Badge>
+              <Badge>Só administrador</Badge>
+            </div>
+            <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
+              <li>Lê os 7 sites monitorados e guarda as manchetes novas.</li>
+              <li>
+                Agrupa manchetes sobre o mesmo fato em <strong className="text-fg">pautas</strong>.
+              </li>
+              <li>
+                Para cada pauta elegível (fonte oficial ou 2+ veículos independentes), a IA escreve a matéria e outra IA confere os fatos.
+              </li>
+              <li>
+                {e.NEWS_PUBLISH_MODE === "auto_restricted"
+                  ? "Publica sozinho só o que passar em todos os critérios; o resto vai para a Fila de revisão."
+                  : "Tudo vai para a Fila de revisão abaixo: nada é publicado sem você aprovar."}
+              </li>
+            </ol>
+            <p className="mt-3 text-xs text-faint">
+              <strong className="text-muted">Quando usar:</strong> 30 a 60 min depois de treinos, classificação ou corrida. Escreve no máximo{" "}
+              {e.NEWS_MAX_ARTICLES_PER_RUN} matérias por vez e {e.NEWS_MAX_ARTICLES_PER_DAY} por dia.{" "}
+              <strong className="text-muted">Não altera</strong> resultados nem classificação.
+              {!aiSel.ai && <span className="text-warn"> IA desativada agora: este botão fará só os passos 1 e 2.</span>}
+            </p>
+            <p className="mt-2 text-xs text-faint">Última execução: {runSummary(lastFull)}</p>
+            <div className="mt-auto pt-4">
+              {user.role === "admin" ? (
+                <form action={runCycleAction}>
+                  <button className="w-full rounded bg-accent px-3 py-2 text-sm font-semibold text-white hover:bg-accent-strong">
+                    Buscar e escrever notícias
+                  </button>
+                </form>
+              ) : (
+                <p className="text-xs text-faint">Somente administradores.</p>
+              )}
+            </div>
+          </Card>
+
+          <Card className="flex flex-col p-5">
+            <h3 className="mb-2 font-display text-xl font-bold uppercase">2 · Só buscar manchetes</h3>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              <Badge tone="ok">Sem IA · custo zero</Badge>
+              <Badge>Segundos</Badge>
+              <Badge>Só administrador</Badge>
+            </div>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
+              <li>Faz apenas os passos 1 e 2 do botão ao lado: lê os sites e agrupa as manchetes.</li>
+              <li>
+                Atualiza o <strong className="text-fg">Radar das fontes</strong> (no site) e as <strong className="text-fg">Pautas abertas</strong>{" "}
+                (mais abaixo).
+              </li>
+              <li>Não escreve nem publica nada.</li>
+            </ul>
+            <p className="mt-3 text-xs text-faint">
+              <strong className="text-muted">Quando usar:</strong> para ver o que está saindo nos sites antes de gastar IA, ou quando o limite do
+              plano gratuito estiver esgotado.
+            </p>
+            <p className="mt-2 text-xs text-faint">Última execução: {runSummary(lastIngest)}</p>
+            <div className="mt-auto pt-4">
+              {user.role === "admin" ? (
+                <form action={runCycleAction}>
+                  <input type="hidden" name="ingestOnly" value="1" />
+                  <button className="w-full rounded border border-line-strong px-3 py-2 text-sm font-semibold hover:border-fg">
+                    Só buscar manchetes
+                  </button>
+                </form>
+              ) : (
+                <p className="text-xs text-faint">Somente administradores.</p>
+              )}
+            </div>
+          </Card>
+
+          <Card className="flex flex-col p-5">
+            <h3 className="mb-2 font-display text-xl font-bold uppercase">3 · Atualizar dados esportivos</h3>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              <Badge tone="ok">Sem IA</Badge>
+              <Badge>Imediato</Badge>
+              <Badge>Até 6× a cada 10 min</Badge>
+            </div>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
+              <li>
+                Descarta a cópia guardada de{" "}
+                <strong className="text-fg">calendário, resultados, grid, classificação, comparativos e probabilidades</strong>.
+              </li>
+              <li>A próxima visita a essas páginas busca tudo de novo na fonte oficial (Jolpica).</li>
+              <li>Não mexe em notícias.</li>
+            </ul>
+            <p className="mt-3 text-xs text-faint">
+              <strong className="text-muted">Quando usar:</strong> depois que o resultado oficial for publicado (algumas horas após a corrida).
+              Sem clicar, o site já se atualiza sozinho a cada 10 a 60 min. Clicar antes de a fonte publicar não traz o resultado mais cedo.
+            </p>
+            <p className="mt-2 text-xs text-faint">Última atualização manual: {lastRefresh ? ago(lastRefresh.createdAt) : "nunca"}</p>
+            <div className="mt-auto pt-4">
+              <form action={refreshSportsDataAction}>
+                <button className="w-full rounded border border-line-strong px-3 py-2 text-sm font-semibold hover:border-fg">
+                  Atualizar dados esportivos agora
+                </button>
+              </form>
+            </div>
+          </Card>
+        </div>
+      </section>
+
+      <section id="fila" className="mb-12 scroll-mt-24">
+        <SectionHeading title="Fila de revisão" kicker="Clique no título para revisar e aprovar" />
         {pending.length === 0 ? (
           <p className="text-sm text-muted">Nada pendente.</p>
         ) : (

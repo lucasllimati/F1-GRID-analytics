@@ -108,7 +108,13 @@ export async function toggleSourceAction(formData: FormData) {
   back("/admin", "ok", `Fonte ${src.name} ${src.enabled ? "desativada" : "ativada"}.`);
 }
 
-async function articleAction(formData: FormData, fn: (actor: { id: string; role: "editor" | "admin" }, id: string) => Promise<void>, okMsg: string) {
+async function articleAction(
+  formData: FormData,
+  fn: (actor: { id: string; role: "editor" | "admin" }, id: string) => Promise<void>,
+  okMsg: string,
+  /** "queue": volta para a fila do painel (aprovar/rejeitar); "article": permanece na matéria. */
+  returnTo: "queue" | "article" = "article",
+) {
   const user = await requireUser();
   const parsed = zId.safeParse(formData.get("id"));
   if (!parsed.success) back("/admin", "erro", "Identificador inválido.");
@@ -120,17 +126,23 @@ async function articleAction(formData: FormData, fn: (actor: { id: string; role:
   }
   revalidatePath("/");
   revalidatePath("/news");
-  const a = await db.article.findUnique({ where: { id }, select: { slug: true } });
+  const a = await db.article.findUnique({ where: { id }, select: { slug: true, headline: true } });
   if (a) revalidatePath(`/news/${a.slug}`);
+  if (returnTo === "queue") {
+    const left = await db.article.count({ where: { status: "in_review" } });
+    const title = a ? `"${a.headline.length > 70 ? `${a.headline.slice(0, 70)}…` : a.headline}"` : "Artigo";
+    const tail = left === 0 ? " A fila de revisão está vazia." : ` ${left} matéria(s) ainda na fila.`;
+    redirect(`/admin?ok=${encodeURIComponent(`${title}: ${okMsg.toLowerCase()}${tail}`)}#fila`);
+  }
   back(`/admin/articles/${id}`, "ok", okMsg);
 }
 
 export async function approveAction(formData: FormData) {
-  await articleAction(formData, (u, id) => approveAndPublish(db, u, id), "Artigo aprovado e publicado.");
+  await articleAction(formData, (u, id) => approveAndPublish(db, u, id), "Aprovado e publicado.", "queue");
 }
 
 export async function rejectAction(formData: FormData) {
-  await articleAction(formData, (u, id) => reject(db, u, id, String(formData.get("reason") ?? "")), "Artigo rejeitado.");
+  await articleAction(formData, (u, id) => reject(db, u, id, String(formData.get("reason") ?? "")), "Rejeitado.", "queue");
 }
 
 export async function retractAction(formData: FormData) {

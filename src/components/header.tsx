@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminStatus } from "./admin-status";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 import { TimezonePicker } from "./timezone";
@@ -31,6 +32,7 @@ export function Header() {
           </ul>
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <AdminStatus />
           <TimezonePicker />
           <ThemeToggle />
         </div>
