@@ -26,6 +26,8 @@ const CHECKS: Check[] = [
   { path: "/robots.txt", status: 200, contains: "Disallow: /admin" },
   { path: "/api/health", status: 200, contains: '"status"' },
   { path: "/api/admin/session", status: 200, contains: '"loggedIn":false' },
+  { path: "/results", status: 200, contains: "Todas as etapas" },
+  { path: `/results?season=${year - 1}`, status: 200 },
   { path: "/race-center", status: 307 },
   { path: "/news/nao-existe-xyz", status: 404 },
   { path: `/calendar/${year}/99`, status: 404 },
@@ -36,6 +38,18 @@ const CHECKS: Check[] = [
 async function main() {
   let failures = 0;
   console.log(`Smoke test em ${BASE}\n`);
+  // Pré-checagem: sem servidor no ar, todas as rotas falhariam com "fetch failed".
+  try {
+    await fetch(`${BASE}/api/health`, { signal: AbortSignal.timeout(30_000) });
+  } catch {
+    console.log(`✗ Nenhum servidor respondendo em ${BASE}.`);
+    console.log("  O smoke test verifica um site que JÁ está no ar. Em outro terminal, rode:");
+    console.log("    npm run dev   (desenvolvimento)   ou   npm run build && npm start   (produção)");
+    console.log('  Espere aparecer "Ready" e rode npm run smoke de novo.');
+    console.log("  Para testar outro endereço: SMOKE_BASE_URL=https://seu-dominio npm run smoke");
+    process.exitCode = 1;
+    return;
+  }
   for (const c of CHECKS) {
     const t = Date.now();
     try {

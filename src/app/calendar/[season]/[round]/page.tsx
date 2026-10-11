@@ -23,8 +23,9 @@ function parseParams(p: Params): { season: number; round: number } | null {
 
 async function getEvent(season: number, round: number) {
   const r = await load(f1.getSchedule(season));
-  if (!r.ok) return { error: r.error, event: null };
-  return { error: null, event: r.data.find((e) => e.round === round) ?? null };
+  if (!r.ok) return { error: r.error, event: null, prev: null, next: null };
+  const idx = r.data.findIndex((e) => e.round === round);
+  return { error: null, event: r.data[idx] ?? null, prev: idx > 0 ? r.data[idx - 1]! : null, next: r.data[idx + 1] ?? null };
 }
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
@@ -70,7 +71,7 @@ const RESULT_COLUMNS = [
 export default async function EventPage({ params, searchParams }: { params: Promise<Params>; searchParams: Promise<{ tab?: string }> }) {
   const p = parseParams(await params);
   if (!p) notFound();
-  const { event, error } = await getEvent(p.season, p.round);
+  const { event, error, prev, next } = await getEvent(p.season, p.round);
   if (error) {
     return (
       <Container className="py-16">
@@ -95,12 +96,31 @@ export default async function EventPage({ params, searchParams }: { params: Prom
     <>
       <div className="telemetry-bg border-b border-line">
         <Container className="py-10">
-          <nav aria-label="Trilha" className="mb-4 text-xs text-muted">
-            <Link href="/calendar" className="hover:text-fg">
-              Calendário {event.season}
-            </Link>{" "}
-            / Etapa {event.round}
-          </nav>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+            <nav aria-label="Trilha">
+              <span>Race Center</span> ·{" "}
+              <Link href={`/calendar?season=${event.season}`} className="hover:text-fg">
+                Calendário {event.season}
+              </Link>{" "}
+              ·{" "}
+              <Link href={`/results?season=${event.season}`} className="hover:text-fg">
+                Resultados
+              </Link>{" "}
+              / Etapa {event.round}
+            </nav>
+            <nav aria-label="Etapas vizinhas" className="flex gap-3">
+              {prev && (
+                <Link href={`/calendar/${prev.season}/${prev.round}`} className="hover:text-fg">
+                  ← {prev.name.replace(" Grand Prix", "")}
+                </Link>
+              )}
+              {next && (
+                <Link href={`/calendar/${next.season}/${next.round}`} className="hover:text-fg">
+                  {next.name.replace(" Grand Prix", "")} →
+                </Link>
+              )}
+            </nav>
+          </div>
           <div className="mb-3 flex flex-wrap gap-2">
             <Badge tone="accent">Etapa {event.round}</Badge>
             <Badge tone={statusTone(event.status)}>{EVENT_STATUS_LABEL[event.status]}</Badge>

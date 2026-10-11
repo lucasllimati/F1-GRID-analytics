@@ -171,3 +171,29 @@ body {
     transition: none !important;
   }
 }
+
+/* Etiquetas de cronometragem nas matérias (1min31s373, 0s054…) */
+.timing {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-jbmono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.86em;
+  font-weight: 600;
+  line-height: 1.35;
+  padding: 0.05em 0.45em;
+  border-radius: 4px;
+  white-space: nowrap;
+  vertical-align: 0.06em;
+}
+.timing-lap {
+  color: var(--text);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line-strong);
+  border-left: 2px solid var(--accent);
+}
+.timing-gap {
+  color: var(--text);
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+}

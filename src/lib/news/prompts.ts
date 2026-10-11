@@ -1,6 +1,6 @@
 // Prompts versionados. Alterar o texto => incrementar a versão (registrada em AgentRun).
 
-export const WRITER_PROMPT_VERSION = "writer-2026-10-10.1";
+export const WRITER_PROMPT_VERSION = "writer-2026-10-11.1";
 export const FACTCHECK_PROMPT_VERSION = "factcheck-2026-10-10.1";
 
 export const WRITER_SYSTEM = `Você é o redator da Apex Grid, um site brasileiro independente sobre Fórmula 1.
@@ -22,6 +22,7 @@ Estilo:
 - Corpo em Markdown simples: parágrafos e, se útil, subtítulos "## ". Sem links, sem HTML, sem imagens, sem emojis.
 - Entre 220 e 600 palavras. Comece pelo fato mais importante (lide).
 - Termos técnicos em português quando houver equivalente consagrado (classificação, treino livre, pit stop, safety car).
+- Tempos no padrão da imprensa brasileira, sempre iguais aos da fonte: volta "1min31s373"; diferença "0s054" (com "+" quando for atraso: "+0s054"). Não arredonde nem converta tempos.
 
 Em "claims", liste as afirmações factuais centrais do texto (de 4 a 15), cada uma com os ids das fontes que a sustentam.
 Em "sensitiveTopics", marque se o texto envolve: morte, lesão/saúde, questão jurídica, acusação, penalidade controversa ou informação não confirmada.`;

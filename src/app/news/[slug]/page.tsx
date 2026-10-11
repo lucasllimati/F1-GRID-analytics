@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArticleBody } from "@/components/article-body";
+import { ArticleBody, inline } from "@/components/article-body";
 import { Badge, Container } from "@/components/ui";
 import { getPublicArticle } from "@/lib/news/queries";
 import { categoryLabel } from "@/lib/news/states";
@@ -61,7 +61,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
           )}
           <Badge tone="accent">{categoryLabel(a.category)}</Badge>
           <h1 className="mt-3 font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl">{a.headline}</h1>
-          <p className="mt-4 text-lg text-muted">{a.dek}</p>
+          <p className="mt-4 text-lg text-muted">{inline(a.dek, "dek")}</p>
           <p className="mt-5 text-xs text-faint">
             {a.publishedAt && <time dateTime={a.publishedAt.toISOString()}>Publicado em {fmt.format(a.publishedAt)} (Brasília)</time>}
             {updated && <> · Atualizado em {fmt.format(updated)}</>} · {a.readingMinutes} min de leitura

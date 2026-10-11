@@ -80,11 +80,37 @@ describe("renderização de artigo (XSS)", () => {
 
 describe("navegação", () => {
   it("marca a seção atual inclusive em subrotas", async () => {
-    const { isActive } = await import("@/components/nav-links");
-    const cal = { href: "/calendar", label: "Calendário" };
-    expect(isActive("/calendar", cal)).toBe(true);
-    expect(isActive("/calendar/2026/17", cal)).toBe(true);
-    expect(isActive("/calendario-falso", cal)).toBe(false);
-    expect(isActive("/news", cal)).toBe(false);
+    const { isActive, NAV } = await import("@/components/nav-links");
+    const item = (label: string) => NAV.find((n) => n.label === label)!;
+    const activeOn = (path: string) => NAV.filter((n) => isActive(path, n)).map((n) => n.label);
+    // Exatamente um item ativo por página conhecida
+    expect(activeOn("/calendar")).toEqual(["Calendário"]);
+    expect(activeOn("/calendar/2026/17")).toEqual(["Race Center"]);
+    expect(activeOn("/results")).toEqual(["Resultados"]);
+    expect(activeOn("/news/alguma-materia")).toEqual(["Notícias"]);
+    expect(activeOn("/")).toEqual([]);
+    expect(isActive("/calendario-falso", item("Calendário"))).toBe(false);
+  });
+});
+
+describe("etiquetas de cronometragem nas matérias", () => {
+  const render = (md: string) => renderToStaticMarkup(createElement(ArticleBody, { markdown: md }));
+  const chips = (html: string, kind: "lap" | "gap") => [...html.matchAll(new RegExp(String.raw`timing-${kind}[^>]*>(?:<svg[\s\S]*?</svg>)?([^<]+)<`, "g"))].map((m) => m[1]);
+
+  it("destaca tempos de volta e diferenças nos formatos usados", () => {
+    const html = render("Marca de 1min31s373 no Q3, apenas 0s054 à frente; Hamilton fez 1:31.496 (+0.123s) e Norris ficou a +0s400.");
+    expect(chips(html, "lap")).toEqual(["1min31s373", "1:31.496"]);
+    expect(chips(html, "gap")).toEqual(["0s054", "+0.123s", "+0s400"]);
+  });
+
+  it("não confunde anos, horários, contagens e palavras com tempos", () => {
+    const html = render("Em 2026, às 21:00, ele somou 25 pontos em 10s de bandeira; código ABC1min31s373x e versão 1.234.");
+    expect(html).not.toContain("timing");
+  });
+
+  it("funciona dentro de negrito e não executa HTML", () => {
+    const html = render("**Pole com 1min31s373** <b>x</b>");
+    expect(chips(html, "lap")).toEqual(["1min31s373"]);
+    expect(html).toContain("&lt;b&gt;");
   });
 });

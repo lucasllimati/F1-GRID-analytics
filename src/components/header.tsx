@@ -1,18 +1,8 @@
 import { AdminStatus } from "./admin-status";
 import { Logo } from "./logo";
-import { NavLinks, type NavItem } from "./nav-links";
+import { NavLinks } from "./nav-links";
 import { ThemeToggle } from "./theme-toggle";
 import { TimezonePicker } from "./timezone";
-
-export const NAV: NavItem[] = [
-  { href: "/race-center", label: "Race Center" },
-  { href: "/calendar", label: "Calendário" },
-  { href: "/results", label: "Resultados" },
-  { href: "/standings", label: "Classificação" },
-  { href: "/championship-probabilities", label: "Probabilidades" },
-  { href: "/head-to-head", label: "Comparar" },
-  { href: "/news", label: "Notícias" },
-];
 
 export function Header() {
   return (
@@ -22,7 +12,7 @@ export function Header() {
         <Logo />
         <nav aria-label="Principal" className="hidden flex-1 lg:block">
           <ul className="flex items-center gap-1">
-            <NavLinks items={NAV} variant="desktop" />
+            <NavLinks variant="desktop" />
           </ul>
         </nav>
         <div className="ml-auto flex items-center gap-2">
@@ -33,7 +23,7 @@ export function Header() {
       </div>
       <nav aria-label="Principal (móvel)" className="border-t border-line lg:hidden">
         <ul className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-2 py-1.5">
-          <NavLinks items={NAV} variant="mobile" />
+          <NavLinks variant="mobile" />
         </ul>
       </nav>
     </header>

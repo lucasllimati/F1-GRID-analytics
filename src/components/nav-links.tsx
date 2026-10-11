@@ -3,19 +3,34 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export type NavItem = { href: string; label: string; match?: string[] };
+export type NavItem = { href: string; label: string; match?: string[]; exclude?: RegExp };
 
-/** Seção atual: rota exata ou subrota (ex.: /calendar/2026/17 ativa "Calendário"). */
+/**
+ * Itens do menu principal. A página de uma etapa (/calendar/2026/17) é o Race Center:
+ * por isso "Calendário" só fica ativo na lista do calendário, não nas etapas.
+ */
+export const NAV: NavItem[] = [
+  { href: "/race-center", label: "Race Center", match: ["/calendar/"] },
+  { href: "/calendar", label: "Calendário", exclude: /^\/calendar\/\d{4}\/\d+/ },
+  { href: "/results", label: "Resultados" },
+  { href: "/standings", label: "Classificação" },
+  { href: "/championship-probabilities", label: "Probabilidades" },
+  { href: "/head-to-head", label: "Comparar" },
+  { href: "/news", label: "Notícias" },
+];
+
+/** Seção atual: rota exata, subrota ou prefixo extra (`match`), respeitando `exclude`. */
 export function isActive(pathname: string, item: NavItem): boolean {
-  const prefixes = [item.href, ...(item.match ?? [])];
-  return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (item.exclude?.test(pathname)) return false;
+  if (pathname === item.href || pathname.startsWith(`${item.href}/`)) return true;
+  return (item.match ?? []).some((p) => (p.endsWith("/") ? pathname.startsWith(p) && pathname.length > p.length : pathname === p || pathname.startsWith(`${p}/`)));
 }
 
-export function NavLinks({ items, variant }: { items: NavItem[]; variant: "desktop" | "mobile" }) {
+export function NavLinks({ variant }: { variant: "desktop" | "mobile" }) {
   const pathname = usePathname() ?? "/";
   return (
     <>
-      {items.map((n) => {
+      {NAV.map((n) => {
         const active = isActive(pathname, n);
         const base =
           variant === "desktop"
@@ -23,11 +38,7 @@ export function NavLinks({ items, variant }: { items: NavItem[]; variant: "deskt
             : "relative block rounded px-3 py-1.5 text-sm hover:text-fg";
         return (
           <li key={n.href} className={variant === "mobile" ? "shrink-0" : undefined}>
-            <Link
-              href={n.href}
-              aria-current={active ? "page" : undefined}
-              className={`${base} ${active ? "text-fg" : "text-muted"}`}
-            >
+            <Link href={n.href} aria-current={active ? "page" : undefined} className={`${base} ${active ? "text-fg" : "text-muted"}`}>
               {n.label}
               {active && (
                 <span
