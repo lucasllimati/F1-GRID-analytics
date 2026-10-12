@@ -34,8 +34,11 @@ jobs:
       - name: Instalar dependências (determinístico)
         run: npm ci
 
-      - name: Prisma — validar schema e gerar cliente
-        run: npx prisma validate && npx prisma generate
+      - name: Prisma — validar schemas (SQLite local e PostgreSQL de produção) e gerar cliente
+        run: |
+          npx prisma validate && npx prisma generate
+          npm run db:pg:check
+          DATABASE_URL="postgresql://u:p@localhost:5432/db" DIRECT_URL="postgresql://u:p@localhost:5432/db" npx prisma validate --schema prisma/postgres/schema.prisma
 
       - name: Verificação de tipos
         run: npm run lint

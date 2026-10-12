@@ -1,0 +1,214 @@
+// ARQUIVO GERADO por scripts/sync-postgres-schema.mjs — NÃO EDITE.
+// Edite prisma/schema.prisma e rode: npm run db:pg:sync
+
+// Apex Grid — modelo de dados (fase 1: redação, fontes, auditoria e administração).
+//
+// Desenvolvimento usa SQLite. Para produção em PostgreSQL troque `provider`
+// para "postgresql" e gere uma nova baseline de migrations (docs/DEPLOY.md).
+// Por compatibilidade com SQLite, enums e JSON são armazenados como String;
+// os valores válidos são validados em src/lib/news/states.ts (Zod).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Conexão direta (sem pooler) para migrations — exigida por Neon/Supabase com pooling.
+  directUrl = env("DIRECT_URL")
+}
+
+// ── Fontes monitoradas ─────────────────────────────────────────────
+
+model NewsSource {
+  id            String     @id // slug estável, ex.: "autosport"
+  name          String
+  homepage      String
+  feedUrl       String
+  language      String // "en" | "pt-BR"
+  kind          String // "official" | "media"
+  enabled       Boolean    @default(true)
+  lastFetchedAt DateTime?
+  lastStatus    String? // "ok" | "error"
+  lastError     String?
+  createdAt     DateTime   @default(now())
+  items         FeedItem[]
+}
+
+// Item bruto de um feed. É dado NÃO confiável: nunca vira instrução para a IA.
+model FeedItem {
+  id                String     @id @default(cuid())
+  sourceId          String
+  source            NewsSource @relation(fields: [sourceId], references: [id])
+  guid              String
+  url               String
+  title             String
+  summary           String     @default("")
+  publishedAt       DateTime
+  // false quando o feed não informa data: publishedAt = horário da coleta (nunca exibido como publicação)
+  publishedAtKnown  Boolean    @default(true)
+  fetchedAt         DateTime   @default(now())
+  // Texto extraído da página original, usado SOMENTE como evidência interna
+  // para checagem de fatos. Nunca é exibido ou republicado.
+  evidenceText      String?
+  evidenceFetchedAt DateTime?
+  excluded          Boolean    @default(false)
+  excludeReason     String?
+  storyId           String?
+  story             Story?     @relation(fields: [storyId], references: [id])
+
+  @@unique([sourceId, guid])
+  @@index([publishedAt])
+  @@index([storyId])
+}
+
+// Pauta: agrupamento de itens de várias fontes sobre o mesmo fato.
+model Story {
+  id          String     @id @default(cuid())
+  titleKey    String // tokens normalizados do título-semente (separados por espaço)
+  firstSeenAt DateTime
+  lastSeenAt  DateTime
+  status      String     @default("open") // open | queued | drafted | skipped | failed
+  skipReason  String?
+  items       FeedItem[]
+  article     Article?
+  createdAt   DateTime   @default(now())
+
+  @@index([status, lastSeenAt])
+}
+
+// ── Redação ────────────────────────────────────────────────────────
+
+model Article {
+  id             String           @id @default(cuid())
+  slug           String           @unique
+  storyId        String?          @unique
+  story          Story?           @relation(fields: [storyId], references: [id])
+  status         String // ver ARTICLE_STATUSES em src/lib/news/states.ts
+  origin         String           @default("ai") // ai | human
+  category       String
+  headline       String
+  dek            String
+  body           String // Markdown restrito (parágrafos, subtítulos, listas)
+  readingMinutes Int
+  sensitive      Boolean          @default(false)
+  reviewReasons  String           @default("[]") // JSON string[]: por que precisa de revisão humana
+  factCheckScore Float? // fração de afirmações sustentadas pelas fontes
+  correctionNote String?
+  publishedAt    DateTime?
+  approvedById   String?
+  approvedBy     AdminUser?       @relation(fields: [approvedById], references: [id])
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  versions       ArticleVersion[]
+  sources        ArticleSource[]
+  claims         ArticleClaim[]
+  agentRuns      AgentRun[]
+
+  @@index([status, publishedAt])
+}
+
+model ArticleVersion {
+  id        String   @id @default(cuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  version   Int
+  headline  String
+  dek       String
+  body      String
+  author    String // "agent:writer", "user:<id>"
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([articleId, version])
+}
+
+model ArticleSource {
+  id               String   @id @default(cuid())
+  articleId        String
+  article          Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  feedItemId       String?
+  publisher        String
+  sourceId         String
+  url              String
+  title            String
+  publishedAt      DateTime
+  publishedAtKnown Boolean  @default(true)
+  accessedAt       DateTime @default(now())
+
+  @@index([articleId])
+}
+
+model ArticleClaim {
+  id         String  @id @default(cuid())
+  articleId  String
+  article    Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  text       String
+  verdict    String // supported | unsupported | contradicted | unverifiable
+  evidence   String  @default("")
+  sourceRefs String  @default("[]") // JSON string[] de sourceId
+
+  @@index([articleId])
+}
+
+model AgentRun {
+  id            String    @id @default(cuid())
+  articleId     String?
+  article       Article?  @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  storyId       String?
+  agent         String // writer | fact_checker
+  model         String
+  promptVersion String
+  status        String // ok | error | refused
+  inputTokens   Int       @default(0)
+  outputTokens  Int       @default(0)
+  costUsd       Float     @default(0)
+  error         String?
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+
+  @@index([startedAt])
+}
+
+// ── Operação ───────────────────────────────────────────────────────
+
+model IngestionRun {
+  id         String    @id @default(cuid())
+  kind       String // news_cycle
+  trigger    String // cron | admin | cli
+  status     String // running | ok | partial | error
+  stats      String    @default("{}") // JSON
+  error      String?
+  // Progresso por etapa (JSON) enquanto status = running; ver src/lib/news/progress.ts
+  progress   String    @default("{}")
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([startedAt])
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  role         String // editor | admin
+  passwordHash String
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  approved     Article[]
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actor     String // "user:<id>", "system:cron", "agent:writer"
+  action    String
+  entity    String
+  entityId  String?
+  details   String   @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+}

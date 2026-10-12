@@ -9,7 +9,7 @@ import { formatDuration, parseProgress } from "@/lib/news/progress";
 import { RunProgressBanner } from "@/components/run-progress";
 import { f1, load } from "@/lib/f1/service";
 import { validateSeason, type DataIssue, type Severity } from "@/lib/f1/validate";
-import { checkDatabase, checkNewsIngestion, checkSportsSource, deriveAlerts, overall, type CheckStatus } from "@/lib/ops/health";
+import { checkConfig, checkDatabase, checkNewsIngestion, checkSportsSource, deriveAlerts, overall, type CheckStatus } from "@/lib/ops/health";
 import pkg from "../../../package.json";
 import { sourceById } from "@/lib/news/sources";
 import { ARTICLE_STATUS_LABEL, type ArticleStatus } from "@/lib/news/states";
@@ -17,6 +17,8 @@ import { logoutAction, refreshSportsDataAction, runCycleAction, toggleSourceActi
 
 export const metadata: Metadata = { title: "Painel", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
+// Ações do painel (ex.: "Só buscar manchetes") rodam aqui: máximo do plano gratuito da Vercel.
+export const maxDuration = 300;
 
 const TRIGGER_LABEL: Record<string, string> = { admin: "Painel", cron: "Agendamento", cli: "Linha de comando" };
 const RUN_STATUS_LABEL: Record<string, string> = { ok: "Concluída", partial: "Parcial", error: "Erro", running: "Rodando" };
@@ -79,7 +81,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
     seasonQuality(),
     deriveAlerts(db, { aiEnabled: Boolean(aiSel.ai), aiReason: aiSel.reason }),
   ]);
-  const sysChecks = [sysDb, checkSportsSource(), sysNews];
+  const sysChecks = [sysDb, checkSportsSource(), sysNews, checkConfig()];
   const sysOverall = overall(sysChecks);
   const dataIssues = quality?.issues ?? null;
   const dataSeason = quality?.season ?? null;

@@ -1,0 +1,53 @@
+# Cria (ou troca a senha de) um usuário da redação NO BANCO DE PRODUÇÃO.
+# A senha vem do secret ADMIN_PASSWORD (nunca de um campo do formulário, que fica visível no histórico).
+# Uso: Actions → "Criar usuário do painel" → Run workflow → informe e-mail, nome e papel.
+name: Criar usuário do painel
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "E-mail de login"
+        required: true
+        type: string
+      name:
+        description: "Nome"
+        required: true
+        type: string
+      role:
+        description: "Papel"
+        required: true
+        type: choice
+        options: [admin, editor]
+        default: admin
+
+permissions:
+  contents: read
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      # Entradas passadas por variável de ambiente (evita injeção de comandos via formulário).
+      IN_EMAIL: ${{ inputs.email }}
+      IN_NAME: ${{ inputs.name }}
+      IN_ROLE: ${{ inputs.role }}
+    steps:
+      - name: Conferir secrets
+        run: |
+          [ -n "$DATABASE_URL" ] || { echo "::error::Secret DATABASE_URL ausente"; exit 1; }
+          [ ${#ADMIN_PASSWORD} -ge 12 ] || { echo "::error::Secret ADMIN_PASSWORD ausente ou com menos de 12 caracteres"; exit 1; }
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run db:pg:generate
+      - run: npm run db:pg:deploy
+      - name: Criar usuário
+        run: npm run admin:create -- --email "$IN_EMAIL" --name "$IN_NAME" --role "$IN_ROLE"

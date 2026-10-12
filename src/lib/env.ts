@@ -4,7 +4,11 @@ import { z } from "zod";
 // (este módulo só é importado em código de servidor).
 
 const schema = z.object({
-  SITE_URL: z.string().url().default("http://localhost:3000"),
+  // Em produção na Vercel, sem SITE_URL configurado usamos o domínio de produção do projeto.
+  SITE_URL: z
+    .string()
+    .url()
+    .default(process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000"),
   SESSION_SECRET: z.string().default(""),
   CRON_SECRET: z.string().default(""),
   NEWS_AI_PROVIDER: z.enum(["anthropic", "gemini", "openai_compatible"]).default("anthropic"),
@@ -16,6 +20,9 @@ const schema = z.object({
   NEWS_PUBLISH_MODE: z.enum(["manual", "semi", "auto_restricted"]).default("semi"),
   NEWS_MAX_ARTICLES_PER_RUN: z.coerce.number().int().min(0).max(20).default(3),
   NEWS_MAX_ARTICLES_PER_DAY: z.coerce.number().int().min(0).max(200).default(24),
+  // Opcional: o botão "Buscar e escrever notícias" dispara o GitHub Actions (sem limite de 5 min).
+  GITHUB_REPOSITORY: z.string().default(""),
+  GITHUB_DISPATCH_TOKEN: z.string().default(""),
   NEWS_FETCH_FULLTEXT: z
     .enum(["true", "false"])
     .default("true")

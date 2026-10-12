@@ -149,3 +149,33 @@ describe("validação de dados", () => {
     expect(issues.some((i) => i.code === "results.orphan_round" && i.severity === "high")).toBe(true);
   });
 });
+
+describe("configuração de produção", () => {
+  it("acusa segredo curto, SQLite e localhost em produção — sem expor valores", async () => {
+    const { configProblems } = await import("@/lib/ops/health");
+    const bad = configProblems({ NODE_ENV: "production", SESSION_SECRET: "zzSEGREDOzz", DATABASE_URL: "file:./dev.db", SITE_URL: "http://localhost:3000" } as NodeJS.ProcessEnv);
+    expect(bad.map((p) => p.severity)).toEqual(["critical", "critical", "medium"]);
+    expect(JSON.stringify(bad)).not.toContain("zzSEGREDOzz");
+    const good = configProblems({ NODE_ENV: "production", SESSION_SECRET: "x".repeat(64), DATABASE_URL: "postgresql://u:p@h/db", SITE_URL: "https://apexgrid.com.br" } as NodeJS.ProcessEnv);
+    expect(good).toEqual([]);
+  });
+});
+
+describe("disparo do GitHub Actions", () => {
+  it("envia o workflow com o token e trata erros sem expor detalhes", async () => {
+    const { dispatchNewsCycle, dispatchConfigured } = await import("@/lib/ops/github");
+    expect(dispatchConfigured({ GITHUB_REPOSITORY: "dono/repo", GITHUB_DISPATCH_TOKEN: "" })).toBe(false);
+    expect(dispatchConfigured({ GITHUB_REPOSITORY: "dono/repo", GITHUB_DISPATCH_TOKEN: "github_pat_" + "x".repeat(30) })).toBe(true);
+    const calls: [string, RequestInit][] = [];
+    const ok = await dispatchNewsCycle({ repository: "dono/repo", token: "tok" }, false, (async (u: string, i: RequestInit) => {
+      calls.push([u, i]);
+      return new Response(null, { status: 204 });
+    }) as unknown as typeof fetch);
+    expect(ok.ok).toBe(true);
+    expect(calls[0]![0]).toBe("https://api.github.com/repos/dono/repo/actions/workflows/news-cycle.yml/dispatches");
+    expect(JSON.parse(String(calls[0]![1].body))).toEqual({ ref: "main", inputs: { ingest_only: false } });
+    const denied = await dispatchNewsCycle({ repository: "dono/repo", token: "tok" }, false, (async () => new Response("secret details", { status: 403 })) as unknown as typeof fetch);
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) expect(denied.error).not.toContain("secret");
+  });
+});

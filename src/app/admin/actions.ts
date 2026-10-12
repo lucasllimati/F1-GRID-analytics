@@ -15,6 +15,8 @@ import { F1_CACHE_TAG } from "@/lib/f1/providers/jolpica";
 import { approveAndPublish, editArticle, EditorialError, reject, reopen, retract } from "@/lib/news/editorial";
 import { LOCK_MINUTES } from "@/lib/news/pipeline";
 import { runConfiguredCycle } from "@/lib/news/run";
+import { env } from "@/lib/env";
+import { dispatchConfigured, dispatchNewsCycle } from "@/lib/ops/github";
 
 // Server Actions do Next verificam Origin x Host (proteção CSRF) e só aceitam POST.
 // Cada ação revalida a sessão e o papel do usuário no servidor.
@@ -70,6 +72,14 @@ export async function runCycleAction(formData: FormData) {
   if (running) {
     const since = running.startedAt.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
     back("/admin", "erro", `Já há um ciclo rodando desde ${since}. Aguarde terminar (acompanhe em "Execuções recentes"); você pode revisar e aprovar matérias enquanto isso.`);
+  }
+  // Produção: o ciclo completo (com IA) roda no GitHub Actions, sem o limite de duração da hospedagem.
+  const e = env();
+  if (!ingestOnly && dispatchConfigured(e)) {
+    const r = await dispatchNewsCycle({ repository: e.GITHUB_REPOSITORY, token: e.GITHUB_DISPATCH_TOKEN }, false);
+    await audit(`user:${user.id}`, "pipeline.dispatch_github", "ingestion_run", null, { ok: r.ok });
+    if (!r.ok) back("/admin", "erro", `Não foi possível iniciar no GitHub Actions: ${r.error}`);
+    back("/admin", "ok", "Ciclo enviado ao GitHub Actions. Ele começa em cerca de 1 minuto; o progresso aparece no topo desta página.");
   }
   await audit(`user:${user.id}`, "pipeline.run_manual", "ingestion_run", null, { ingestOnly });
   // Roda DEPOIS da resposta: o painel não fica preso esperando a IA (planos gratuitos podem levar minutos).

@@ -1,0 +1,74 @@
+# Ciclo da redação em produção: coleta as fontes, agrupa pautas e (com IA configurada) redige e checa.
+# Roda aqui, e não na Vercel, porque um ciclo com IA pode passar dos 5 minutos que a Vercel permite
+# por função no plano gratuito. O progresso aparece no banner do /admin, pois é gravado no banco.
+#
+# Custo: grátis em repositório público. Em repositório privado, cada execução leva ~2–5 min do
+# limite gratuito de 2.000 min/mês — ajuste o "cron" abaixo (ex.: a cada 2 horas: "17 */2 * * *").
+name: Ciclo de notícias
+
+on:
+  schedule:
+    - cron: "17 * * * *" # a cada hora, no minuto 17 (UTC). O GitHub pode atrasar alguns minutos.
+  workflow_dispatch:
+    inputs:
+      ingest_only:
+        description: "Só buscar manchetes (sem IA)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Nunca dois ciclos ao mesmo tempo (o banco também tem trava própria).
+concurrency:
+  group: news-cycle
+  cancel-in-progress: false
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Não roda em forks nem antes de o banco de produção estar configurado.
+    if: ${{ github.repository_owner == 'lucasllimati' }}
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      NEWS_AI_PROVIDER: ${{ vars.NEWS_AI_PROVIDER || 'gemini' }}
+      NEWS_AI_MODEL: ${{ vars.NEWS_AI_MODEL }}
+      NEWS_PUBLISH_MODE: ${{ vars.NEWS_PUBLISH_MODE || 'semi' }}
+      NEWS_MAX_ARTICLES_PER_RUN: ${{ vars.NEWS_MAX_ARTICLES_PER_RUN || '2' }}
+      NEWS_MAX_ARTICLES_PER_DAY: ${{ vars.NEWS_MAX_ARTICLES_PER_DAY || '24' }}
+      SITE_URL: ${{ vars.SITE_URL || 'https://example.com' }}
+      NEWS_TRIGGER: cron
+      LOG_LEVEL: info
+    steps:
+      - name: Verificar segredo do banco
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::warning::Secret DATABASE_URL não configurado — veja docs/DEPLOY.md. Ciclo ignorado."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/checkout@v4
+        if: env.SKIP != '1'
+
+      - uses: actions/setup-node@v4
+        if: env.SKIP != '1'
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        if: env.SKIP != '1'
+        run: npm ci
+
+      - name: Cliente do banco (PostgreSQL)
+        if: env.SKIP != '1'
+        run: npm run db:pg:generate
+
+      - name: Rodar ciclo
+        if: env.SKIP != '1'
+        run: |
+          if [ "${{ inputs.ingest_only }}" = "true" ]; then npm run news:ingest; else npm run news:cycle; fi

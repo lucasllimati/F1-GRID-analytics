@@ -17,7 +17,13 @@
     "news:ingest": "tsx scripts/news-cycle.ts --ingest-only",
     "ai:check": "tsx scripts/ai-check.ts",
     "data:check": "tsx scripts/data-check.ts",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "db:pg:sync": "node scripts/sync-postgres-schema.mjs",
+    "db:pg:check": "node scripts/sync-postgres-schema.mjs --check",
+    "db:pg:generate": "prisma generate --schema prisma/postgres/schema.prisma",
+    "db:pg:deploy": "prisma migrate deploy --schema prisma/postgres/schema.prisma",
+    "build:vercel": "prisma generate --schema prisma/postgres/schema.prisma && prisma migrate deploy --schema prisma/postgres/schema.prisma && next build",
+    "db:pg:migration": "node scripts/pg-migration.mjs"
   },
   "engines": {
     "node": ">=20.9"

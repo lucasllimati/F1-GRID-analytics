@@ -49,6 +49,28 @@ export async function checkNewsIngestion(db: PrismaClient, now = new Date()): Pr
   return { name: "Monitoramento de notícias", status: "ok", detail: `último ciclo há ${Math.max(1, Math.round(age / 60_000))} min (${last.status})` };
 }
 
+export type ConfigProblem = { severity: Severity; message: string; action: string };
+
+/** Erros de configuração que quebram (ou degradam) a produção. Só mensagens — nunca valores. */
+export function configProblems(e: NodeJS.ProcessEnv = process.env): ConfigProblem[] {
+  const prod = e.NODE_ENV === "production";
+  const out: ConfigProblem[] = [];
+  if ((e.SESSION_SECRET ?? "").length < 32)
+    out.push({ severity: prod ? "critical" : "low", message: "SESSION_SECRET ausente ou curto: o login do painel não funciona", action: "Gere 64 caracteres aleatórios (docs/DEPLOY.md) e configure na hospedagem." });
+  if (prod && (e.DATABASE_URL ?? "").startsWith("file:"))
+    out.push({ severity: "critical", message: "Banco SQLite em produção: os dados se perdem a cada deploy", action: "Use PostgreSQL (Neon) e o build \"npm run build:vercel\"." });
+  if (prod && /^http:\/\/localhost/.test(e.SITE_URL ?? "") && !e.VERCEL_PROJECT_PRODUCTION_URL)
+    out.push({ severity: "medium", message: "SITE_URL aponta para localhost: links do RSS, sitemap e compartilhamento ficam errados", action: "Configure SITE_URL com o domínio público (https://…)." });
+  return out;
+}
+
+export function checkConfig(): HealthCheck {
+  const p = configProblems();
+  if (p.some((x) => x.severity === "critical")) return { name: "Configuração", status: "down", detail: p.map((x) => x.message).join("; ") };
+  if (p.some((x) => x.severity !== "low")) return { name: "Configuração", status: "degraded", detail: p.map((x) => x.message).join("; ") };
+  return { name: "Configuração", status: "ok", detail: p.length ? p.map((x) => x.message).join("; ") : "variáveis essenciais presentes" };
+}
+
 export function overall(checks: HealthCheck[]): CheckStatus {
   if (checks.some((c) => c.name === "Banco de dados" && c.status === "down")) return "down";
   if (checks.some((c) => c.status === "down" || c.status === "degraded")) return "degraded";
@@ -64,6 +86,10 @@ export async function deriveAlerts(db: PrismaClient, opts: { aiEnabled: boolean;
   if (dbCheck.status === "down") {
     alerts.push({ id: "db.down", severity: "critical", category: "infraestrutura", title: "Banco de dados sem resposta", detail: dbCheck.detail, component: "banco", action: "Verifique DATABASE_URL e o serviço do banco; veja docs/RUNBOOK.md." });
     return alerts;
+  }
+
+  for (const [i, p] of configProblems().entries()) {
+    alerts.push({ id: `config.${i}`, severity: p.severity, category: "infraestrutura", title: p.message, detail: "", component: "configuração", action: p.action });
   }
 
   const sports = checkSportsSource();

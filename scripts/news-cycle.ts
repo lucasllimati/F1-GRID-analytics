@@ -9,7 +9,7 @@ async function main() {
   const { runConfiguredCycle } = await import("../src/lib/news/run");
   const { db } = await import("../src/lib/db");
   const ingestOnly = process.argv.includes("--ingest-only");
-  const { runId, stats } = await runConfiguredCycle("cli", { ingestOnly, log: (m) => console.log(m) });
+  const { runId, stats } = await runConfiguredCycle(process.env.NEWS_TRIGGER === "cron" ? "cron" : "cli", { ingestOnly, log: (m) => console.log(m) });
   console.log(`\nCiclo ${runId} concluído:`);
   console.log(JSON.stringify(stats, null, 2));
   await db.$disconnect();

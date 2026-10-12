@@ -15,6 +15,12 @@ npm run dev                   # http://localhost:3000
 
 No PowerShell, defina a senha com `$env:ADMIN_PASSWORD="..."` antes do `admin:create`.
 
+## Publicar na web
+
+Não dá para usar só o GitHub Pages (ele serve apenas páginas estáticas). A publicação usa **Vercel** (site) + **Neon** (PostgreSQL, região São Paulo) + **GitHub Actions** (ciclo de notícias agendado), todos com plano gratuito. Passo a passo em [docs/DEPLOY.md](docs/DEPLOY.md).
+
+O desenvolvimento local continua com SQLite; o schema de produção (`prisma/postgres/`) é gerado a partir do principal (`npm run db:pg:sync`).
+
 ## Ativar a redação com IA
 
 Sem IA configurada, o sistema monitora e agrupa pautas, mas não escreve. Provedores suportados (`NEWS_AI_PROVIDER`):
@@ -32,7 +38,7 @@ Comece sempre em `NEWS_PUBLISH_MODE="semi"` (tudo vai para revisão em `/admin`)
 | Comando | O que faz |
 |---|---|
 | `npm run dev` / `build` / `start` | Next.js |
-| `npm test` | 124 testes (fusos/DST, pontuação, modelo, RSS, deduplicação, política editorial, segurança, pipeline integrado) |
+| `npm test` | 132 testes (fusos/DST, pontuação, modelo, RSS, deduplicação, política editorial, segurança, pipeline integrado) |
 | `npm run lint` | checagem de tipos |
 | `npm run news:ingest` | monitora as 28 fontes (oficiais, internacionais, europeias e brasileiras) e agrupa pautas |
 | `npm run news:cycle` | ciclo completo (monitorar → redigir → checar → publicar/revisar) |
@@ -40,7 +46,8 @@ Comece sempre em `NEWS_PUBLISH_MODE="semi"` (tudo vai para revisão em `/admin`)
 | `npm run ai:check` | testa a conexão com a IA configurada |
 | `npm run data:check` | valida a consistência dos dados esportivos da temporada contra a fonte |
 | `npm run smoke` | teste de fumaça das rotas (use `SMOKE_BASE_URL` para produção) |
-| `npm run db:migrate` / `db:deploy` | migrations |
+| `npm run db:migrate` / `db:deploy` | migrations (local, SQLite) |
+| `npm run db:pg:sync` / `db:pg:migration -- nome` | schema e migrations de produção (PostgreSQL) |
 
 ## Páginas
 

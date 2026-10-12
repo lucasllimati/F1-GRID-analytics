@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { checkDatabase, checkNewsIngestion, checkSportsSource, overall } from "@/lib/ops/health";
+import { checkConfig, checkDatabase, checkNewsIngestion, checkSportsSource, overall } from "@/lib/ops/health";
 import pkg from "../../../../package.json";
 
 export const runtime = "nodejs";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 // Expõe só estados agregados — nenhum erro interno, caminho ou segredo.
 // 200 = ok/degradado (site no ar), 503 = banco fora (site sem conteúdo editorial).
 export async function GET() {
-  const checks = [await checkDatabase(db), checkSportsSource()];
+  const checks = [await checkDatabase(db), checkSportsSource(), checkConfig()];
   try {
     checks.push(await checkNewsIngestion(db));
   } catch {

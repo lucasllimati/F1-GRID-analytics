@@ -134,10 +134,10 @@ describe("escolha do provedor", () => {
 describe("proteção contra chave no campo errado", () => {
   const base = { ANTHROPIC_API_KEY: "", GEMINI_API_KEY: "", NEWS_AI_BASE_URL: "", NEWS_AI_API_KEY: "" };
   it("recusa NEWS_AI_MODEL com cara de chave e não expõe o valor", () => {
-    const s = createEditorialAI({ ...base, NEWS_AI_PROVIDER: "gemini", NEWS_AI_MODEL: "AQ.Ab8RNsegredo_123" });
+    const s = createEditorialAI({ ...base, NEWS_AI_PROVIDER: "gemini", NEWS_AI_MODEL: "AQ.FAKE_valor_de_teste_123" });
     expect(s.ai).toBeNull();
     expect(s.model).toBe("(inválido)");
-    expect(JSON.stringify(s)).not.toContain("segredo");
+    expect(JSON.stringify(s)).not.toContain("FAKE_valor");
   });
   it("aceita nomes de modelo comuns", () => {
     for (const m of ["gemini-3.8-flash", "qwen2.5:14b", "meta-llama/llama-4-scout:free"]) {
