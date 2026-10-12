@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
 import { JOLPICA_INFO } from "@/lib/f1/providers/jolpica";
 import { THRESHOLDS } from "@/lib/news/policy";
-import { NEWS_SOURCES } from "@/lib/news/sources";
+import { LANGUAGE_LABEL, NEWS_SOURCES, REGION_LABEL } from "@/lib/news/sources";
 
 export const metadata: Metadata = {
   title: "Fontes e política editorial",
@@ -18,35 +18,47 @@ export default function SourcesPage() {
       </PageHeader>
       <Container className="mt-10 max-w-4xl space-y-14">
         <section>
-          <SectionHeading title="Veículos monitorados" />
-          <Card className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th scope="col">Fonte</th>
-                  <th scope="col">Tipo</th>
-                  <th scope="col">Idioma</th>
-                  <th scope="col">Grupo editorial</th>
-                </tr>
-              </thead>
-              <tbody>
-                {NEWS_SOURCES.map((s) => (
-                  <tr key={s.id}>
-                    <td>
-                      <a href={s.homepage} target="_blank" rel="noopener noreferrer" className="font-medium hover:text-accent">
-                        {s.name}
-                      </a>
-                    </td>
-                    <td>{s.kind === "official" ? "Oficial" : "Imprensa"}</td>
-                    <td>{s.language}</td>
-                    <td className="text-muted">{s.group}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
+          <SectionHeading title={`Veículos monitorados (${NEWS_SOURCES.length})`} />
+          <div className="space-y-6">
+            {(Object.keys(REGION_LABEL) as (keyof typeof REGION_LABEL)[]).map((region) => {
+              const list = NEWS_SOURCES.filter((s) => s.region === region);
+              if (list.length === 0) return null;
+              return (
+                <Card key={region} className="overflow-x-auto">
+                  <h3 className="border-b border-line px-4 py-3 text-xs font-semibold uppercase tracking-widest text-muted">
+                    {REGION_LABEL[region]} · {list.length}
+                  </h3>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Fonte</th>
+                        <th scope="col">Idioma</th>
+                        <th scope="col">Grupo editorial</th>
+                        <th scope="col">Cobertura</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.map((s) => (
+                        <tr key={s.id}>
+                          <td>
+                            <a href={s.homepage} target="_blank" rel="noopener noreferrer" className="font-medium hover:text-accent">
+                              {s.name}
+                            </a>
+                          </td>
+                          <td>{LANGUAGE_LABEL[s.language]}</td>
+                          <td className="text-muted">{s.group}</td>
+                          <td className="text-muted">{s.requireF1Keyword ? "várias categorias (filtramos só F1)" : "Fórmula 1"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Card>
+              );
+            })}
+          </div>
           <p className="mt-3 text-sm text-muted">
-            Veículos do mesmo grupo editorial (por exemplo, Autosport e Motorsport.com) não contam como confirmações independentes entre si.
+            Veículos do mesmo grupo editorial (por exemplo, Autosport, Motorsport.com e Formel1.de, todos da Motorsport Network) não contam
+            como confirmações independentes entre si. Fontes oficiais (F1, FIA e Pirelli, fornecedora oficial de pneus) bastam sozinhas.
           </p>
         </section>
 

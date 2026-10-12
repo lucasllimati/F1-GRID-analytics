@@ -117,6 +117,8 @@ export async function runNewsCycle(opts: CycleOptions): Promise<{ runId: string;
 }
 
 async function ensureSources(db: PrismaClient) {
+  // Fontes removidas do cadastro (ex.: feed que parou de ser atualizado) deixam de ser coletadas.
+  await db.newsSource.updateMany({ where: { id: { notIn: NEWS_SOURCES.map((s) => s.id) }, enabled: true }, data: { enabled: false } });
   for (const s of NEWS_SOURCES) {
     await db.newsSource.upsert({
       where: { id: s.id },
@@ -157,7 +159,7 @@ async function ingestFeeds(db: PrismaClient, stats: CycleStats, now: () => Date,
           if (existing.has(it.guid)) continue;
           const publishedAt = it.publishedAt ?? now();
           if (publishedAt < cutoff) continue;
-          const reason = exclusionReason(def, it.title, it.summary);
+          const reason = exclusionReason(def, it.title, it.summary, it.url);
           await db.feedItem.create({
             data: {
               sourceId: row.id,

@@ -4,6 +4,7 @@ import { NewsCard, NewsGrid } from "@/components/news-card";
 import { LocalTime } from "@/components/timezone";
 import { Card, Container, EmptyState, PageHeader, SectionHeading } from "@/components/ui";
 import { countPublished, listPublished, radarItems } from "@/lib/news/queries";
+import { LANGUAGE_LABEL, type SourceLanguage } from "@/lib/news/sources";
 import { CATEGORIES, CATEGORY_LABEL, type Category } from "@/lib/news/states";
 
 export const revalidate = 120;
@@ -102,7 +103,9 @@ export default async function NewsPage({ searchParams }: { searchParams: Promise
                   <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-x-4 py-2 text-sm">
                     <a href={r.url} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-accent">
                       {r.title}
-                      {r.source.language === "en" && <span className="ml-1 text-xs text-faint">(em inglês)</span>}
+                      {r.source.language !== "pt-BR" && (
+                        <span className="ml-1 text-xs text-faint">(em {LANGUAGE_LABEL[r.source.language as SourceLanguage] ?? r.source.language})</span>
+                      )}
                     </a>
                     <span className="text-xs text-faint">
                       {r.source.name} · {!r.publishedAtKnown && "coletado "}

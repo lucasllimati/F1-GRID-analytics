@@ -5,6 +5,7 @@ import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Draft, EditorialAI, FactCheck } from "@/lib/news/ai";
 import { runNewsCycle } from "@/lib/news/pipeline";
+import { NEWS_SOURCES } from "@/lib/news/sources";
 import type { PromptSource } from "@/lib/news/prompts";
 
 // Teste de integração do pipeline: banco SQLite real (arquivo temporário), feeds HTTP simulados
@@ -50,6 +51,8 @@ function mockFetch() {
     const u = new URL(String(input instanceof Request ? input.url : input));
     const key = u.toString();
     if (FEEDS[key] !== undefined) return new Response(FEEDS[key], { status: 200, headers: { "content-type": "application/rss+xml" } });
+    // Demais fontes cadastradas: feed válido, sem itens.
+    if (NEWS_SOURCES.some((src) => src.feedUrl === key)) return new Response(rss([]), { status: 200, headers: { "content-type": "application/rss+xml" } });
     if (u.pathname === "/robots.txt") return new Response("not found", { status: 404 });
     const html = `<html><body><nav><p>menu</p></nav><article>${[1, 2, 3, 4].map((n) => `<p>Evidence paragraph ${n} with enough words about the session and the result for checking.</p>`).join("")}</article></body></html>`;
     return new Response(html, { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
@@ -148,7 +151,7 @@ describe("pipeline da redação (integração)", () => {
     const progress = JSON.parse(run!.progress);
     expect(progress.label).toBe("Buscar e escrever notícias");
     const byKey = Object.fromEntries(progress.phases.map((p: { key: string }) => [p.key, p]));
-    expect(byKey.sources).toMatchObject({ status: "done", done: 7, total: 7 });
+    expect(byKey.sources).toMatchObject({ status: "done", done: NEWS_SOURCES.length, total: NEWS_SOURCES.length });
     expect(byKey.cluster).toMatchObject({ status: "done" });
     expect(byKey.writing.status).toBe("done");
     expect(byKey.writing.done).toBe(byKey.writing.total);

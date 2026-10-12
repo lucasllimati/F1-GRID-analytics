@@ -4,7 +4,7 @@ import { extractArticleText } from "@/lib/news/extract";
 import { decidePublication, exclusionReason, sensitivityReasons, storyEligible, type PublishInput } from "@/lib/news/policy";
 import { escapeForPrompt, renderSources } from "@/lib/news/prompts";
 import { parseFeed } from "@/lib/news/rss";
-import { sourceById } from "@/lib/news/sources";
+import { NEWS_SOURCES, sourceById } from "@/lib/news/sources";
 import { canTransition } from "@/lib/news/states";
 import { copyOverlap, slugify, stripHtml } from "@/lib/news/text";
 
@@ -21,6 +21,14 @@ describe("parser de feeds", () => {
     expect(items[0]!.url).toBe("https://www.autosport.com/f1/news/x/123/");
     expect(items[0]!.summary).toBe("Texto resumo");
     expect(items[0]!.publishedAt?.toISOString()).toBe("2026-10-10T12:00:00.000Z");
+  });
+
+  it("entende datas com abreviação de fuso (BST da Sky Sports) e não inventa fuso desconhecido", async () => {
+    const { parseDate } = await import("@/lib/news/rss");
+    expect(parseDate("Mon, 12 Oct 2026 14:45:00 BST")?.toISOString()).toBe("2026-10-12T13:45:00.000Z");
+    expect(parseDate("Mon, 12 Oct 2026 14:45:00 CEST")?.toISOString()).toBe("2026-10-12T12:45:00.000Z");
+    expect(parseDate("Mon, 12 Oct 2026 14:45:00 GMT")?.toISOString()).toBe("2026-10-12T14:45:00.000Z");
+    expect(parseDate("Mon, 12 Oct 2026 14:45:00 XYZ")).toBeNull();
   });
 
   it("lê Atom", () => {
@@ -167,5 +175,51 @@ describe("defesa contra prompt injection", () => {
       { id: "S1", publisher: "X", url: "https://x", publishedAt: "", language: "en", title: evil, summary: evil, excerpt: evil },
     ]);
     expect(rendered.match(/<\/source>/g)).toHaveLength(1);
+  });
+});
+
+describe("fontes ampliadas (28) e filtros multilíngues", () => {
+  const all = NEWS_SOURCES;
+  const src = (id: string) => sourceById(id)!;
+
+  it("cadastro íntegro: ids únicos, HTTPS, grupos e idiomas definidos", () => {
+    expect(all.length).toBeGreaterThanOrEqual(28);
+    expect(new Set(all.map((s) => s.id)).size).toBe(all.length);
+    for (const s of all) {
+      expect(s.feedUrl.startsWith("https://")).toBe(true);
+      expect(s.articleHosts.length).toBeGreaterThan(0);
+      expect(s.group).toBeTruthy();
+    }
+    expect(all.filter((s) => s.region === "brasil").length).toBeGreaterThanOrEqual(6);
+    expect(all.filter((s) => s.kind === "official").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("grupos editoriais: Motorsport Network conta como uma só confirmação", () => {
+    expect(storyEligible([src("autosport"), src("formel1-de"), src("motorsport-es")])).toBe(false);
+    expect(storyEligible([src("ge-globo"), src("guardian")])).toBe(true);
+  });
+
+  it("reconhece F1 por piloto/equipe em feeds multiesportivos (pt, es, it, de)", () => {
+    expect(exclusionReason(src("grande-premio"), "Russell descarta troca de motor em Austin", "")).toBeNull();
+    expect(exclusionReason(src("speedcafe"), "Broc Feeney's frank admission after Bathurst", "")).toMatch(/escopo/);
+    expect(exclusionReason(src("planetf1"), "Portimao GT World Challenge entry list", "")).toMatch(/escopo/);
+    expect(exclusionReason(src("racingnews365"), "Fórmula 1: Antonelli lidera", "")).toBeNull();
+  });
+
+  it("descarta não-notícia em vários idiomas e por URL de vídeo", () => {
+    expect(exclusionReason(src("formulapassion"), "Rassegna stampa - La Ferrari incanta", "")).toMatch(/não-notícia/);
+    expect(exclusionReason(src("speedcafe"), "PHOTOS: Around the grounds", "")).toMatch(/não-notícia/);
+    expect(exclusionReason(src("marca"), "GP de Singapur de F1 en directo", "")).toMatch(/não-notícia/);
+    expect(exclusionReason(src("formel1-de"), "TV-Quoten Singapur 2026", "")).toMatch(/não-notícia/);
+    expect(exclusionReason(src("ge-globo"), "Verstappen vence", "", "https://video.gazzetta.it/f1/x")).toMatch(/vídeo/);
+    expect(exclusionReason(src("ge-globo"), "Verstappen vence em Singapura", "", "https://ge.globo.com/motor/formula-1/noticia/x.ghtml")).toBeNull();
+  });
+
+  it("temas sensíveis em espanhol, italiano e alemão — sem falsos positivos comuns", () => {
+    expect(sensitivityReasons(["Piloto herido tras el accidente"])).toContain("acidente com feridos ou saúde");
+    expect(sensitivityReasons(["Indagine della FIA sul team"])).toContain("acusação ou investigação");
+    expect(sensitivityReasons(["Gerüchte um Wechsel zu Audi"])).toContain("informação não confirmada (rumor)");
+    expect(sensitivityReasons(["Corrida atrasada por causa da chuva"])).toHaveLength(0);
+    expect(exclusionReason(src("guardian"), "Hamilton's quote after Singapore", "")).toBeNull();
   });
 });

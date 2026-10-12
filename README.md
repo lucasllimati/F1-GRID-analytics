@@ -34,7 +34,7 @@ Comece sempre em `NEWS_PUBLISH_MODE="semi"` (tudo vai para revisão em `/admin`)
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm test` | 124 testes (fusos/DST, pontuação, modelo, RSS, deduplicação, política editorial, segurança, pipeline integrado) |
 | `npm run lint` | checagem de tipos |
-| `npm run news:ingest` | monitora as 7 fontes e agrupa pautas |
+| `npm run news:ingest` | monitora as 28 fontes (oficiais, internacionais, europeias e brasileiras) e agrupa pautas |
 | `npm run news:cycle` | ciclo completo (monitorar → redigir → checar → publicar/revisar) |
 | `npm run admin:create` | cria/atualiza usuário da redação |
 | `npm run ai:check` | testa a conexão com a IA configurada |

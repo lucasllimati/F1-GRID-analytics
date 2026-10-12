@@ -29,9 +29,34 @@ function asArray<T>(v: T | T[] | undefined): T[] {
   return Array.isArray(v) ? v : [v];
 }
 
-function parseDate(s: string): Date | null {
+/**
+ * Abreviações de fuso usadas em feeds RSS que o Date.parse não entende (ex.: Sky Sports usa "BST").
+ * Cada abreviação JÁ denota um deslocamento fixo (BST = horário de verão britânico = UTC+1),
+ * então a tradução é exata. Abreviação desconhecida → data desconhecida (nunca inventada).
+ */
+const TZ_ABBREVIATIONS: Record<string, string> = {
+  BST: "+0100",
+  IST: "+0100", // Irish Standard Time (verão irlandês)
+  CET: "+0100",
+  CEST: "+0200",
+  WET: "+0000",
+  WEST: "+0100",
+  EET: "+0200",
+  EEST: "+0300",
+  BRT: "-0300",
+  AEST: "+1000",
+  AEDT: "+1100",
+  JST: "+0900",
+};
+
+export function parseDate(s: string): Date | null {
   if (!s) return null;
-  const t = Date.parse(s);
+  let t = Date.parse(s);
+  if (Number.isNaN(t)) {
+    const m = /\s([A-Z]{3,4})$/.exec(s.trim());
+    const offset = m ? TZ_ABBREVIATIONS[m[1]!] : undefined;
+    if (offset) t = Date.parse(s.trim().replace(/\s[A-Z]{3,4}$/, ` ${offset}`));
+  }
   return Number.isNaN(t) ? null : new Date(t);
 }
 

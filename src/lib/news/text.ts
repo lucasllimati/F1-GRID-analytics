@@ -59,7 +59,11 @@ const STOPWORDS = new Set(
     "after before over into about new says say said will would could should has have had not but up out off more than " +
     "f1 formula grand prix gp race news what why how who when where vs v " +
     "o os as um uma uns umas e ou de do da dos das em no na nos nas por para com sem sobre apos antes ao aos " +
-    "que se seu sua seus suas diz afirma revela sera foi sao esta estao como mais menos ja ainda formula"
+    "que se seu sua seus suas diz afirma revela sera foi sao esta estao como mais menos ja ainda formula " +
+    // espanhol, italiano e alemão (fontes europeias): melhora o agrupamento entre veículos do mesmo idioma
+    "los las del por para con una dice tras ante sobre segun " +
+    "gli della delle dei con per una che dopo nel nella alla sul " +
+    "der die das und mit von fur ist ein eine nach bei auf den dem des"
   ).split(/\s+/),
 );
 

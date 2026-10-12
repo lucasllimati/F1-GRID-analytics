@@ -266,7 +266,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
               <Badge>Só administrador</Badge>
             </div>
             <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
-              <li>Lê os 7 sites monitorados e guarda as manchetes novas.</li>
+              <li>Lê os {sources.filter((s) => s.enabled).length || "vários"} sites monitorados e guarda as manchetes novas.</li>
               <li>
                 Agrupa manchetes sobre o mesmo fato em <strong className="text-fg">pautas</strong>.
               </li>
