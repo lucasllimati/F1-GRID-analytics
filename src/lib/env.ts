@@ -17,6 +17,10 @@ const schema = z.object({
   GEMINI_API_KEY: z.string().default(""),
   NEWS_AI_BASE_URL: z.string().default(""),
   NEWS_AI_API_KEY: z.string().default(""),
+  // Cadeia de reserva: "provedor:modelo" separados por vírgula ("none" desliga). Ver docs/GEMINI.md.
+  NEWS_AI_FALLBACKS: z.string().default(""),
+  OPENROUTER_API_KEY: z.string().default(""),
+  GROQ_API_KEY: z.string().default(""),
   NEWS_PUBLISH_MODE: z.enum(["manual", "semi", "auto_restricted"]).default("semi"),
   NEWS_MAX_ARTICLES_PER_RUN: z.coerce.number().int().min(0).max(20).default(3),
   NEWS_MAX_ARTICLES_PER_DAY: z.coerce.number().int().min(0).max(200).default(24),

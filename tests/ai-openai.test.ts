@@ -119,10 +119,11 @@ describe("escolha do provedor", () => {
     expect(s.ai).toBeNull();
     expect(s.reason).toMatch(/GEMINI_API_KEY/);
   });
-  it("Gemini com chave usa o modelo padrão gratuito", () => {
+  it("Gemini com chave usa o modelo padrão gratuito e reserva em outros modelos Gemini (cota por modelo)", () => {
     const s = createEditorialAI({ ...base, NEWS_AI_PROVIDER: "gemini", GEMINI_API_KEY: "k" });
     expect(s.ai).not.toBeNull();
-    expect(s.model).toBe(GEMINI_DEFAULT_MODEL);
+    expect(s.model).toBe(`${GEMINI_DEFAULT_MODEL} → gemini-3.6-flash → gemini-3.5-flash-lite`);
+    expect(createEditorialAI({ ...base, NEWS_AI_PROVIDER: "gemini", GEMINI_API_KEY: "k", NEWS_AI_FALLBACKS: "none" }).model).toBe(GEMINI_DEFAULT_MODEL);
   });
   it("Anthropic continua disponível", () => {
     const s = createEditorialAI({ ...base, NEWS_AI_PROVIDER: "anthropic", ANTHROPIC_API_KEY: "k" });

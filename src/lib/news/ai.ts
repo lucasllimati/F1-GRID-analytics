@@ -45,9 +45,25 @@ export const zFactCheck = z.object({
 export type FactCheck = z.infer<typeof zFactCheck>;
 
 export type Usage = { inputTokens: number; outputTokens: number; costUsd: number };
+/**
+ * Tipo da falha — orienta a cadeia de reserva (ai-chain.ts) e o pipeline:
+ *  quota          cota diária/mensal esgotada → não adianta insistir hoje neste provedor
+ *  rate_limit     limite por minuto → outro provedor agora; este volta mais tarde
+ *  overloaded     5xx / "alta demanda" do provedor
+ *  network        DNS, conexão, timeout
+ *  auth           chave inválida/sem permissão → desativa o provedor
+ *  invalid_output resposta fora do formato (JSON/esquema), truncada
+ *  refused        recusa do modelo
+ *  bad_request    requisição rejeitada (4xx)
+ */
+export type FailureKind = "quota" | "rate_limit" | "overloaded" | "network" | "auth" | "invalid_output" | "refused" | "bad_request" | "unknown";
+
+/** Falhas que indicam indisponibilidade TEMPORÁRIA da IA (a pauta deve ser tentada de novo depois). */
+export const TRANSIENT_FAILURES: FailureKind[] = ["quota", "rate_limit", "overloaded", "network"];
+
 export type AgentResult<T> =
   | { ok: true; data: T; usage: Usage; model: string; promptVersion: string }
-  | { ok: false; error: string; refused: boolean; usage: Usage; model: string; promptVersion: string };
+  | { ok: false; error: string; refused: boolean; kind?: FailureKind; usage: Usage; model: string; promptVersion: string };
 
 export type PingResult = { ok: true; detail: string } | { ok: false; detail: string };
 
@@ -105,29 +121,42 @@ export class AnthropicEditorialAI implements EditorialAI {
         costUsd: cost(this.model, response.usage.input_tokens, response.usage.output_tokens),
       };
       if (response.stop_reason === "refusal") {
-        return { ok: false, error: "Modelo recusou a solicitação", refused: true, usage, model: response.model, promptVersion };
+        return { ok: false, error: "Modelo recusou a solicitação", refused: true, kind: "refused", usage, model: response.model, promptVersion };
       }
       if (response.stop_reason === "max_tokens") {
-        return { ok: false, error: "Resposta truncada (max_tokens)", refused: false, usage, model: response.model, promptVersion };
+        return { ok: false, error: "Resposta truncada (max_tokens)", refused: false, kind: "invalid_output", usage, model: response.model, promptVersion };
       }
       const parsed = response.parsed_output;
       if (!parsed) {
-        return { ok: false, error: "Saída fora do esquema", refused: false, usage, model: response.model, promptVersion };
+        return { ok: false, error: "Saída fora do esquema", refused: false, kind: "invalid_output", usage, model: response.model, promptVersion };
       }
       // Validação dupla: o esquema também é aplicado localmente.
       const check = schema.safeParse(parsed);
       if (!check.success) {
-        return { ok: false, error: "Saída inválida no esquema local", refused: false, usage, model: response.model, promptVersion };
+        return { ok: false, error: "Saída inválida no esquema local", refused: false, kind: "invalid_output", usage, model: response.model, promptVersion };
       }
       return { ok: true, data: check.data, usage, model: response.model, promptVersion };
     } catch (err) {
       let msg = "Erro desconhecido";
-      if (err instanceof Anthropic.AuthenticationError) msg = "Chave da API inválida";
-      else if (err instanceof Anthropic.RateLimitError) msg = "Limite de requisições da API atingido";
-      else if (err instanceof Anthropic.BadRequestError) msg = `Requisição inválida: ${err.message}`;
-      else if (err instanceof Anthropic.APIError) msg = `Erro da API (${err.status}): ${err.message}`;
-      else if (err instanceof Error) msg = err.message;
-      return { ok: false, error: msg, refused: false, usage: empty, model: this.model, promptVersion };
+      let kind: FailureKind = "unknown";
+      if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+        msg = "Chave da API inválida";
+        kind = "auth";
+      } else if (err instanceof Anthropic.RateLimitError) {
+        msg = "Limite de requisições da API atingido";
+        kind = "rate_limit";
+      } else if (err instanceof Anthropic.BadRequestError) {
+        msg = `Requisição inválida: ${err.message}`;
+        // Saldo insuficiente chega como 400: equivale a cota esgotada.
+        kind = /credit balance|billing/i.test(err.message) ? "quota" : "bad_request";
+      } else if (err instanceof Anthropic.APIConnectionError) {
+        msg = "Falha de rede ao chamar a API";
+        kind = "network";
+      } else if (err instanceof Anthropic.APIError) {
+        msg = `Erro da API (${err.status}): ${err.message}`;
+        kind = (err.status ?? 0) >= 500 ? "overloaded" : "bad_request";
+      } else if (err instanceof Error) msg = err.message;
+      return { ok: false, error: msg, refused: false, kind, usage: empty, model: this.model, promptVersion };
     }
   }
 

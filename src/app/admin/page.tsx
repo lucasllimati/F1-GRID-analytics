@@ -79,7 +79,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
     checkDatabase(db),
     checkNewsIngestion(db),
     seasonQuality(),
-    deriveAlerts(db, { aiEnabled: Boolean(aiSel.ai), aiReason: aiSel.reason }),
+    deriveAlerts(db, { aiEnabled: Boolean(aiSel.ai), aiReason: aiSel.reason, aiChain: aiSel.model }),
   ]);
   const sysChecks = [sysDb, checkSportsSource(), sysNews, checkConfig()];
   const sysOverall = overall(sysChecks);

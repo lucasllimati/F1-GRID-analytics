@@ -2,13 +2,23 @@
 # Roda aqui, e não na Vercel, porque um ciclo com IA pode passar dos 5 minutos que a Vercel permite
 # por função no plano gratuito. O progresso aparece no banner do /admin, pois é gravado no banco.
 #
-# Custo: grátis em repositório público. Em repositório privado, cada execução leva ~2–5 min do
-# limite gratuito de 2.000 min/mês — ajuste o "cron" abaixo (ex.: a cada 2 horas: "17 */2 * * *").
+# Agenda (horário de Brasília = UTC−3; o GitHub só aceita UTC e o Brasil não tem horário de verão
+# desde 2019 — se voltar a ter, ajuste os horários abaixo):
+#   • Seg–sex, 8h às 19h ............ de hora em hora (horário comercial)
+#   • Sexta, 20h às 23h ............. de hora em hora (treinos nas Américas)
+#   • Sábado e domingo, 6h às 23h ... de hora em hora (fim de semana de corrida)
+#   • Sáb. e dom., 0h e 3h .......... corridas na Ásia/Oceania durante a madrugada
+# ≈ 104 execuções/semana ≈ 1.350 min/mês do limite gratuito (2.000 min/mês em repositório privado).
+# Minuto 17 para fugir do pico de agendamentos na hora cheia; o GitHub pode atrasar alguns minutos.
 name: Ciclo de notícias
 
 on:
   schedule:
-    - cron: "17 * * * *" # a cada hora, no minuto 17 (UTC). O GitHub pode atrasar alguns minutos.
+    - cron: "17 11-22 * * 1-5" #  seg–sex 08h–19h (Brasília)
+    - cron: "17 23 * * 5" #        sexta 20h
+    - cron: "17 0-2 * * 6,0,1" #   sex/sáb/dom 21h–23h (em UTC já é o dia seguinte)
+    - cron: "17 9-23 * * 6,0" #    sábado e domingo 06h–20h
+    - cron: "17 3,6 * * 6,0" #     sábado e domingo 00h e 03h
   workflow_dispatch:
     inputs:
       ingest_only:
@@ -35,6 +45,10 @@ jobs:
       DIRECT_URL: ${{ secrets.DIRECT_URL }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Cadeia de reserva (opcional): outros provedores com plano gratuito, cada um com a sua chave.
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      NEWS_AI_FALLBACKS: ${{ vars.NEWS_AI_FALLBACKS }}
       NEWS_AI_PROVIDER: ${{ vars.NEWS_AI_PROVIDER || 'gemini' }}
       NEWS_AI_MODEL: ${{ vars.NEWS_AI_MODEL }}
       NEWS_PUBLISH_MODE: ${{ vars.NEWS_PUBLISH_MODE || 'semi' }}

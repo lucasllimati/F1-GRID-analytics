@@ -75,6 +75,7 @@ No GitHub: repositório → **Settings → Secrets and variables → Actions**.
 | `DIRECT_URL` | mesma do Neon (direct) |
 | `GEMINI_API_KEY` | sua chave |
 | `ADMIN_PASSWORD` | senha do painel de produção |
+| `OPENROUTER_API_KEY` | *(recomendado)* chave gratuita do OpenRouter — reserva de outra empresa quando o Gemini falhar ([docs/GEMINI.md](GEMINI.md#cadeia-de-reserva-quando-a-cota-acaba)) |
 
 **Variables** (aba *Variables*, opcional — há valores padrão):
 
@@ -83,10 +84,10 @@ No GitHub: repositório → **Settings → Secrets and variables → Actions**.
 | `NEWS_PUBLISH_MODE` | `semi` |
 | `NEWS_MAX_ARTICLES_PER_RUN` | `2` |
 | `SITE_URL` | `https://SEU-PROJETO.vercel.app` |
+| `NEWS_AI_FALLBACKS` | vazio (cadeia padrão) ou lista `provedor:modelo,…` |
 
-O workflow **Ciclo de notícias** (`.github/workflows/news-cycle.yml`) roda de hora em hora. Para testar agora: **Actions → Ciclo de notícias → Run workflow** (marque "Só buscar manchetes" na primeira vez).
+O workflow **Ciclo de notícias** (`.github/workflows/news-cycle.yml`) roda de hora em hora no horário comercial (seg–sex, 8h–19h de Brasília), com janela maior no fim de semana de corrida (sex 20h → dom 23h) — ≈1.350 min/mês, dentro dos 2.000 gratuitos de repositório privado. Para testar agora: **Actions → Ciclo de notícias → Run workflow** (marque "Só buscar manchetes" na primeira vez).
 
-Repositório privado? Edite a linha `cron:` do arquivo para `"17 */2 * * *"` (a cada 2 h).
 
 > O GitHub desativa agendamentos de repositórios públicos sem nenhum commit por 60 dias. Se isso acontecer, aparece um aviso na aba Actions com o botão para reativar.
 

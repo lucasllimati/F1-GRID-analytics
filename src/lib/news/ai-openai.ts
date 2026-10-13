@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { zDraft, zFactCheck, type AgentResult, type Draft, type EditorialAI, type FactCheck, type PingResult, type Usage } from "./ai";
+import { zDraft, zFactCheck, type AgentResult, type Draft, type EditorialAI, type FactCheck, type FailureKind, type PingResult, type Usage } from "./ai";
 import {
   FACTCHECK_PROMPT_VERSION,
   FACTCHECK_SYSTEM,
@@ -24,6 +24,8 @@ export type OpenAICompatibleConfig = {
   pricing?: { in: number; out: number };
   timeoutMs?: number;
   maxRetries?: number;
+  /** Espera máxima entre tentativas (ms). Na cadeia de reserva é curta: melhor trocar de provedor. */
+  maxBackoffMs?: number;
   fetchImpl?: typeof fetch; // injeção para testes
   sleep?: (ms: number) => Promise<void>;
 };
@@ -48,6 +50,19 @@ function jsonSchemaFor(schema: z.ZodType): Record<string, unknown> {
   const js = z.toJSONSchema(schema) as Record<string, unknown>;
   delete js.$schema;
   return js;
+}
+
+/**
+ * Classifica erros HTTP de provedores compatíveis com OpenAI.
+ * Gemini, OpenRouter e Groq usam 429 tanto para limite por minuto quanto para cota diária;
+ * a cota diária é identificada pelo texto ("per day", "PerDay", "daily", "free-models-per-day").
+ */
+export function classifyHttp(status: number, body: string): FailureKind {
+  if (status === 401 || status === 403) return "auth";
+  if (status === 402) return "quota"; // sem créditos (OpenRouter)
+  if (status === 429) return /per ?day|perday|daily|per-day|quota exceeded for metric.*day/i.test(body) ? "quota" : "rate_limit";
+  if (status >= 500) return "overloaded";
+  return "bad_request";
 }
 
 /** Extrai o objeto JSON da resposta, tolerando cercas ```json que alguns modelos adicionam. */
@@ -131,10 +146,10 @@ export class OpenAICompatibleEditorialAI implements EditorialAI {
 
         const choice = data.choices?.[0];
         if (choice?.message?.refusal) {
-          return { ok: false, error: "Modelo recusou a solicitação", refused: true, usage, model, promptVersion };
+          return { ok: false, error: "Modelo recusou a solicitação", refused: true, kind: "refused", usage, model, promptVersion };
         }
         if (choice?.finish_reason === "length") {
-          return { ok: false, error: "Resposta truncada (limite de tokens)", refused: false, usage, model, promptVersion };
+          return { ok: false, error: "Resposta truncada (limite de tokens)", refused: false, kind: "invalid_output", usage, model, promptVersion };
         }
         const content = choice?.message?.content ?? "";
         let raw: unknown;
@@ -142,7 +157,7 @@ export class OpenAICompatibleEditorialAI implements EditorialAI {
           raw = extractJson(content);
         } catch {
           if (attempt < maxRetries) continue; // modelos gratuitos às vezes erram o formato: tenta de novo
-          return { ok: false, error: "Saída sem JSON válido", refused: false, usage, model, promptVersion };
+          return { ok: false, error: "Saída sem JSON válido", refused: false, kind: "invalid_output", usage, model, promptVersion };
         }
         const parsed = schema.safeParse(raw);
         if (!parsed.success) {
@@ -151,6 +166,7 @@ export class OpenAICompatibleEditorialAI implements EditorialAI {
             ok: false,
             error: `Saída fora do esquema: ${parsed.error.issues.slice(0, 3).map((i) => i.path.join(".")).join(", ")}`,
             refused: false,
+            kind: "invalid_output",
             usage,
             model,
             promptVersion,
@@ -163,31 +179,36 @@ export class OpenAICompatibleEditorialAI implements EditorialAI {
             this.schemaMode = "json_object"; // provedor não suporta json_schema
             continue;
           }
-          if ((err.status === 429 || err.status >= 500) && attempt < maxRetries) {
-            // Plano gratuito tem limite por minuto: respeita Retry-After ou recua exponencialmente.
-            await this.sleep(err.retryAfterMs ?? Math.min(60_000, 5_000 * 2 ** attempt));
+          const kind = classifyHttp(err.status, err.message);
+          // Cota diária esgotada: insistir só piora (e gasta tempo do ciclo).
+          if ((kind === "rate_limit" || kind === "overloaded") && attempt < maxRetries) {
+            // Limite por minuto ou sobrecarga: respeita Retry-After ou recua exponencialmente (com teto).
+            const cap = this.cfg.maxBackoffMs ?? 60_000;
+            await this.sleep(Math.min(cap, err.retryAfterMs ?? 5_000 * 2 ** attempt));
             continue;
           }
           const msg =
-            err.status === 401 || err.status === 403
+            kind === "auth"
               ? "Chave da API inválida ou sem permissão"
-              : err.status === 429
-                ? "Limite de uso do plano atingido (tente mais tarde)"
-                : err.message;
-          return { ok: false, error: msg, refused: false, usage, model, promptVersion };
+              : kind === "quota"
+                ? "Cota do plano esgotada (renova no próximo período)"
+                : kind === "rate_limit"
+                  ? "Limite de uso por minuto atingido"
+                  : err.message;
+          return { ok: false, error: msg, refused: false, kind, usage, model, promptVersion };
         }
         // Falha de rede (conexão recusada/reiniciada, DNS, timeout): também é transitória.
         if (attempt < maxRetries) {
-          await this.sleep(Math.min(60_000, 5_000 * 2 ** attempt));
+          await this.sleep(Math.min(this.cfg.maxBackoffMs ?? 60_000, 5_000 * 2 ** attempt));
           continue;
         }
         const cause = (err as { cause?: { code?: string; message?: string } }).cause;
         const detail = cause?.code ?? cause?.message;
         const base = err instanceof Error ? err.message : "Erro desconhecido";
-        return { ok: false, error: `Falha de rede: ${base}${detail ? ` (${detail})` : ""}`, refused: false, usage, model, promptVersion };
+        return { ok: false, error: `Falha de rede: ${base}${detail ? ` (${detail})` : ""}`, refused: false, kind: "network", usage, model, promptVersion };
       }
     }
-    return { ok: false, error: "Tentativas esgotadas", refused: false, usage, model, promptVersion };
+    return { ok: false, error: "Tentativas esgotadas", refused: false, kind: "invalid_output", usage, model, promptVersion };
   }
 
   async ping(): Promise<PingResult> {

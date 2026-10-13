@@ -78,7 +78,10 @@ export function overall(checks: HealthCheck[]): CheckStatus {
 }
 
 /** Alertas operacionais a partir do estado atual. */
-export async function deriveAlerts(db: PrismaClient, opts: { aiEnabled: boolean; aiReason?: string; now?: Date }): Promise<OpsAlert[]> {
+export async function deriveAlerts(
+  db: PrismaClient,
+  opts: { aiEnabled: boolean; aiReason?: string; aiChain?: string; now?: Date },
+): Promise<OpsAlert[]> {
   const now = opts.now ?? new Date();
   const alerts: OpsAlert[] = [];
 
@@ -142,6 +145,19 @@ export async function deriveAlerts(db: PrismaClient, opts: { aiEnabled: boolean;
   if (!opts.aiEnabled) {
     alerts.push({ id: "ai.disabled", severity: "low", category: "ia", title: "Redação automática desativada", detail: opts.aiReason ?? "IA não configurada", component: "IA", action: "Configure a chave no .env (docs/GEMINI.md) e rode npm run ai:check." });
   }
+  // Reserva só com modelos do mesmo provedor: se ele ficar instável, todos caem juntos.
+  if (opts.aiEnabled && opts.aiChain && !/openrouter|groq|claude/.test(opts.aiChain)) {
+    alerts.push({
+      id: "ai.single_provider",
+      severity: "low",
+      category: "ia",
+      title: "Reserva de IA depende de um único provedor",
+      detail: `Cadeia atual: ${opts.aiChain}`,
+      component: "IA",
+      action: "Crie uma chave gratuita no OpenRouter e configure OPENROUTER_API_KEY: a cadeia passa a usar um modelo de outra empresa quando o Gemini estiver instável (docs/GEMINI.md).",
+    });
+  }
+
   const dayAgo = new Date(now.getTime() - 24 * HOUR);
   const [aiFails, aiTotal] = await Promise.all([
     db.agentRun.count({ where: { startedAt: { gt: dayAgo }, status: { not: "ok" } } }),
@@ -155,7 +171,8 @@ export async function deriveAlerts(db: PrismaClient, opts: { aiEnabled: boolean;
       title: "Muitas falhas da IA nas últimas 24 h",
       detail: `${aiFails} de ${aiTotal} execuções falharam`,
       component: "IA",
-      action: "Veja \"Falhas recentes de agentes\". No plano gratuito é comum \"limite atingido\"; reduza NEWS_MAX_ARTICLES_PER_RUN.",
+      action:
+        "Veja \"Falhas recentes de agentes\". Pautas não são perdidas: com a IA indisponível elas voltam para a fila e são tentadas no próximo ciclo. Para reduzir falhas, adicione um provedor de outra empresa à cadeia (OPENROUTER_API_KEY) e/ou reduza NEWS_MAX_ARTICLES_PER_RUN.",
     });
   }
 

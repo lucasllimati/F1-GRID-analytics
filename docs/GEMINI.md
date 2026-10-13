@@ -61,11 +61,42 @@ Abra **http://localhost:3000/admin**, entre com seu usuário e veja a **Fila de 
 |---|---|---|
 | `IA desativada — GEMINI_API_KEY ausente` | chave vazia ou `.env` não salvo | confira o `.env`; reinicie o `npm run dev` |
 | `Chave da API inválida ou sem permissão` | chave copiada errada, revogada ou com restrição de IP | gere outra chave |
-| `Limite de uso do plano atingido` | estourou o limite por minuto/dia do plano gratuito | espere; reduza `NEWS_MAX_ARTICLES_PER_RUN` para `1` ou `2` |
+| `Limite de uso por minuto atingido` / `Cota do plano esgotada` | estourou o limite por minuto/dia do modelo | a cadeia de reserva assume (abaixo); se todas caírem, as pautas voltam para a fila |
+| `Nenhum provedor disponível — …` | todos os modelos da cadeia falharam neste ciclo | as pautas ficam "adiadas" e são retomadas no próximo ciclo; adicione o OpenRouter |
 | `Saída fora do esquema` / `Saída sem JSON válido` | o modelo não seguiu o formato após 4 tentativas | a pauta fica marcada como falha; tente outro modelo |
 | Nenhum artigo gerado | nenhuma pauta elegível (precisa de fonte oficial ou ≥2 veículos independentes, com ≥30 min) | normal; rode de novo mais tarde |
 
-O sistema já espera e tenta de novo automaticamente quando recebe "limite atingido" (respeitando o tempo indicado pelo Google).
+## Cadeia de reserva (quando a cota acaba)
+
+No plano gratuito do Google a cota é **por modelo**. Por isso, quando o modelo principal esgota ou fica sobrecarregado, a mesma tarefa passa para o próximo da cadeia — com a mesma checagem de fatos e as mesmas regras editoriais:
+
+```
+gemini-3.8-flash → gemini-3.6-flash → gemini-3.5-flash-lite → (OpenRouter gratuito, se configurado)
+```
+
+- Modelo com cota esgotada sai da cadeia até o fim do ciclo (não insiste).
+- Se **todos** falharem, nenhuma pauta é perdida: ela volta para a fila como "adiada" e o ciclo para de tentar até o próximo horário.
+- `npm run ai:check` testa cada elo e mostra ✅/❌.
+
+**Recomendado: adicionar um provedor de outra empresa.** Os três modelos acima são do Google — se o serviço do Google ficar instável, caem juntos. O OpenRouter oferece modelos gratuitos (sufixo `:free`) de outras empresas:
+
+1. Crie uma conta em **https://openrouter.ai** (pode entrar com Google/GitHub).
+2. Abra **https://openrouter.ai/settings/keys** → **Create Key** → copie (começa com `sk-or-`).
+3. No `.env` (e como *secret* `OPENROUTER_API_KEY` no GitHub, para o agendamento):
+
+   ```env
+   OPENROUTER_API_KEY="sk-or-..."
+   ```
+
+Pronto: o modelo `nvidia/nemotron-3-super-120b-a12b:free` entra no fim da cadeia. Limites gratuitos do OpenRouter: 20 pedidos/min e 50 pedidos/dia (1.000/dia se a conta tiver ao menos US$ 10 de créditos comprados). Cada notícia usa ~2 pedidos (redação + checagem).
+
+Para escolher a cadeia manualmente, use `NEWS_AI_FALLBACKS` (ordem = prioridade; `none` desliga):
+
+```env
+NEWS_AI_FALLBACKS="gemini:gemini-3.6-flash,openrouter:google/gemma-4-31b-it:free,openrouter:nvidia/nemotron-3-super-120b-a12b:free"
+```
+
+> Não existe "token gratuito compartilhado" entre empresas: cada provedor exige a **sua** chave (todas gratuitas aqui). O sistema só alterna entre as que você configurar.
 
 ## Se a chave vazar
 

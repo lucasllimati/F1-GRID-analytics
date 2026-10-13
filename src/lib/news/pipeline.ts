@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { robotsAllows, safeFetchText } from "../net/safe-fetch";
-import type { AgentResult, EditorialAI } from "./ai";
+import { TRANSIENT_FAILURES, type AgentResult, type EditorialAI } from "./ai";
 import { clusterItems, CLUSTER_WINDOW_HOURS } from "./cluster";
 import { extractArticleText } from "./extract";
 import { decidePublication, exclusionReason, sensitivityReasons, storyEligible, type FactCheckSummary } from "./policy";
@@ -37,8 +37,13 @@ export type CycleStats = {
   skipped: number;
   failed: number;
   aiCostUsd: number;
+  /** Pautas devolvidas à fila porque a IA estava indisponível (cota, sobrecarga, rede). */
+  deferred?: number;
   note?: string;
 };
+
+/** A IA (toda a cadeia de reserva) está temporariamente indisponível: adiar, não descartar. */
+class AiUnavailableError extends Error {}
 
 const ITEM_MAX_AGE_DAYS = 7;
 const SETTLE_MINUTES = 30; // espera outras fontes repercutirem antes de redigir
@@ -351,6 +356,19 @@ async function writeStories(
     try {
       await processStory(db, ai, opts, s.id, s.items, stats, now, log, step);
     } catch (err) {
+      if (err instanceof AiUnavailableError) {
+        // Nenhum provedor disponível: as pautas restantes ficam "open" para o próximo ciclo
+        // (insistir agora só gastaria tentativas e pioraria os limites).
+        stats.deferred = ranked.length - idx;
+        stats.note = `IA indisponível (${err.message.slice(0, 160)}): ${stats.deferred} pauta(s) adiada(s) para o próximo ciclo.`;
+        log(`[ia] indisponível — ${stats.deferred} pauta(s) adiada(s)`);
+        pr.update("writing", {
+          status: "done",
+          done: ranked.length * steps,
+          detail: `IA indisponível agora: ${stats.deferred} pauta(s) adiada(s) para o próximo ciclo · ${stats.drafted} redigida(s)`,
+        });
+        return;
+      }
       stats.failed++;
       const message = err instanceof Error ? err.message : String(err);
       await db.story.update({ where: { id: s.id }, data: { status: "failed", skipReason: message.slice(0, 500) } });
@@ -419,6 +437,11 @@ async function processStory(
   const written = await ai.write(promptSources);
   await recordAgentRun(db, "writer", written, storyId, null, stats);
   if (!written.ok) {
+    if (written.kind && TRANSIENT_FAILURES.includes(written.kind)) {
+      // Cota/sobrecarga/rede: a pauta volta para a fila e é tentada no próximo ciclo.
+      await db.story.update({ where: { id: storyId }, data: { status: "open", skipReason: `adiada: ${written.error}`.slice(0, 500) } });
+      throw new AiUnavailableError(written.error);
+    }
     stats.failed++;
     await db.story.update({ where: { id: storyId }, data: { status: "failed", skipReason: written.error } });
     return;

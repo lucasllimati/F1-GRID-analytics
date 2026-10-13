@@ -31,6 +31,8 @@ Sem IA configurada, o sistema monitora e agrupa pautas, mas não escreve. Proved
 | `anthropic` | produção (`claude-opus-5-5`, structured outputs e fallback em recusas) | `ANTHROPIC_API_KEY` |
 | `openai_compatible` | Ollama local, Groq, OpenRouter… | `NEWS_AI_BASE_URL`, `NEWS_AI_API_KEY`, `NEWS_AI_MODEL` |
 
+Se o provedor principal esgotar a cota ou ficar instável, uma **cadeia de reserva** assume (outros modelos Gemini e, com `OPENROUTER_API_KEY`, um modelo gratuito de outra empresa); se todos falharem, as pautas voltam para a fila e são retomadas no próximo ciclo. Ver [docs/GEMINI.md](docs/GEMINI.md#cadeia-de-reserva-quando-a-cota-acaba).
+
 Comece sempre em `NEWS_PUBLISH_MODE="semi"` (tudo vai para revisão em `/admin`). Só passe para `auto_restricted` depois de revisar a qualidade dos textos.
 
 ## Comandos
@@ -38,7 +40,7 @@ Comece sempre em `NEWS_PUBLISH_MODE="semi"` (tudo vai para revisão em `/admin`)
 | Comando | O que faz |
 |---|---|
 | `npm run dev` / `build` / `start` | Next.js |
-| `npm test` | 132 testes (fusos/DST, pontuação, modelo, RSS, deduplicação, política editorial, segurança, pipeline integrado) |
+| `npm test` | 143 testes (fusos/DST, pontuação, modelo, RSS, deduplicação, política editorial, segurança, pipeline integrado) |
 | `npm run lint` | checagem de tipos |
 | `npm run news:ingest` | monitora as 28 fontes (oficiais, internacionais, europeias e brasileiras) e agrupa pautas |
 | `npm run news:cycle` | ciclo completo (monitorar → redigir → checar → publicar/revisar) |

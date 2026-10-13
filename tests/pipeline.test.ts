@@ -192,7 +192,34 @@ describe("pipeline da redação (integração)", () => {
     await db.ingestionRun.update({ where: { id: live.id }, data: { status: "ok" } });
   });
 
-  it("falha de fonte não derruba o ciclo", async () => {
+  it("IA indisponível (cota esgotada em toda a cadeia): pautas voltam para a fila e o ciclo para de insistir", async () => {
+    vi.stubGlobal("fetch", mockFetch());
+    await db.article.deleteMany();
+    await db.story.updateMany({ data: { status: "open", skipReason: null } });
+    let writes = 0;
+    const quotaAI: EditorialAI = {
+      ping: async () => ({ ok: false, detail: "sem cota" }),
+      write: async () => {
+        writes++;
+        return { ok: false, error: "Nenhum provedor disponível — gemini: cota esgotada", refused: false, kind: "quota", usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, model: "chain", promptVersion: "t" };
+      },
+      factCheck: async () => {
+        throw new Error("não deveria checar sem rascunho");
+      },
+    };
+    const { stats } = await runNewsCycle({ db, ...base, ai: quotaAI });
+    expect(writes).toBe(1); // parou na primeira indisponibilidade
+    expect(stats.failed).toBe(0);
+    expect(stats.deferred).toBe(2);
+    expect(stats.note).toMatch(/adiada/);
+    expect(await db.story.count({ where: { status: "failed" } })).toBe(0);
+    expect(await db.story.count({ where: { status: "open", skipReason: { startsWith: "adiada" } } })).toBe(1);
+    // No ciclo seguinte, com a IA de volta, as mesmas pautas são redigidas.
+    const again = await runNewsCycle({ db, ...base });
+    expect(again.stats.drafted).toBe(2);
+  });
+
+    it("falha de fonte não derruba o ciclo", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("erro", { status: 503 })),
