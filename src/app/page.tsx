@@ -3,6 +3,8 @@ import { NextSessionCountdown } from "@/components/countdown";
 import { NewsGrid } from "@/components/news-card";
 import { LocalTime, SessionTimesTable } from "@/components/timezone";
 import { Badge, Card, Container, EmptyState, ErrorState, SectionHeading, SourceNote, statusTone } from "@/components/ui";
+import { gpName } from "@/lib/f1/gp-names";
+import { HISTORY, onThisDay } from "@/lib/f1/history";
 import { maxRemainingDriverPoints, pointsSystem } from "@/lib/f1/points";
 import { eventStart, lastCompletedEvent, nextEvent, remainingScoringSessions } from "@/lib/f1/schedule";
 import { driverName, f1, load } from "@/lib/f1/service";
@@ -341,6 +343,41 @@ export default async function HomePage() {
           contam como vitória ou pódio nestes números.
         </SourceNote>
       </Container>
+
+      {/* ── Neste dia na história ── */}
+      {(() => {
+        const today = onThisDay(HISTORY, new Date());
+        const [main, ...more] = today;
+        if (!main) return null;
+        return (
+          <Container className="mt-16">
+            <Card className="grid gap-6 p-5 md:grid-cols-[1.6fr_1fr]">
+              <div>
+                <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-faint">
+                  Neste dia, em {main.race.season} · há {main.years} anos
+                </p>
+                <p className="mt-2 text-lg">{main.label}</p>
+                <Link href="/records" className="mt-3 inline-block text-sm font-semibold text-accent hover:underline">
+                  Recordes e campeões desde 1950 →
+                </Link>
+              </div>
+              {more.length > 0 && (
+                <div className="border-line md:border-l md:pl-6">
+                  <p className="mb-1 text-xs text-faint">Também neste dia:</p>
+                  <ul className="space-y-1 text-sm text-muted">
+                    {more.slice(0, 4).map((x) => (
+                      <li key={`${x.race.season}-${x.race.round}`}>
+                        <strong className="tabular text-fg">{x.race.season}</strong> {gpName(x.race.name)}
+                        {x.race.winner && <>, vitória de {x.race.winner.name}</>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </Card>
+          </Container>
+        );
+      })()}
 
       {/* ── F2 / F3 ── */}
       <Container className="mt-16">

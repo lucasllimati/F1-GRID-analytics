@@ -57,6 +57,20 @@ Sintomas: páginas com "Dados indisponíveis", alerta "Fonte de dados esportivos
 2. Divergência legítima (ex.: meio ponto em corrida encurtada, punição posterior): registrar e seguir.
 3. Erro da fonte: o site **não corrige** valores automaticamente; avise os mantenedores da Jolpica e, se necessário, desative temporariamente a página afetada.
 
+## Histórico (recordes, campeões, "neste dia")
+
+`src/data/f1-history.json` guarda as temporadas encerradas; a temporada atual é somada ao vivo. **Uma vez por ano**, depois da última corrida (e de a fonte publicar a classificação final), rode:
+
+```bash
+npm run data:history -- --until 2026
+```
+
+Leva ~1 h (uma consulta a cada 8 s, abaixo do limite de ~500/h da Jolpica). As respostas ficam em `.cache/jolpica/`: se parar no meio, rode de novo e ele continua de onde parou. Para refazer só uma temporada, apague `.cache/jolpica/<ano>-*`. Revise o diff do JSON e faça commit. Enquanto não atualizar, `/records` mostra um aviso de que há temporada encerrada fora do histórico.
+
+## Classificação atrasada na fonte
+
+A Jolpica às vezes publica os resultados antes de atualizar a classificação (já aconteceu com a de construtores, uma etapa atrás). O site detecta isso (rodada da classificação < última corrida publicada) e recalcula pela soma dos resultados, a partir de 2010. Quando a fonte se atualiza, a classificação oficial volta a prevalecer (punições da FIA incluídas).
+
 ## Reprocessar notícias
 
 - Só coletar: Painel → "Só buscar manchetes" ou `npm run news:ingest`.

@@ -1,20 +1,48 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TrendChart, type ChartSeries } from "@/components/charts";
+import { SeasonGridLegend, SeasonGridTable, type GridMode } from "@/components/season-grid";
+import { SeasonStrip } from "@/components/season-strip";
 import { Card, Container, ErrorState, PageHeader, SectionHeading, SourceNote } from "@/components/ui";
-import { analyzeEntity, championshipPositions, seasonRounds, type SeasonData } from "@/lib/f1/compare";
+import { analyzeEntity, championshipPositions, freshConstructorStandings, freshDriverStandings, seasonRounds, type SeasonData } from "@/lib/f1/compare";
 import { fallbackLabel, roundLabels } from "@/lib/f1/round-labels";
+import { buildSeasonGrid } from "@/lib/f1/season-grid";
 import { driverName, f1, load } from "@/lib/f1/service";
 
 export const revalidate = 900;
 export const metadata: Metadata = {
   title: "Classificação",
-  description: "Classificação de pilotos e construtores da Fórmula 1, com evolução de pontos por etapa.",
+  description: "Classificação de pilotos e construtores da Fórmula 1 etapa por etapa: pontos, posições e evolução na temporada.",
   alternates: { canonical: "/standings" },
 };
 
-export default async function StandingsPage({ searchParams }: { searchParams: Promise<{ season?: string }> }) {
+type SP = { season?: string; view?: string; mode?: string };
+
+function tabHref(sp: { season: number | null; view: "drivers" | "teams"; mode: GridMode }) {
+  const q = new URLSearchParams();
+  if (sp.season) q.set("season", String(sp.season));
+  if (sp.view === "teams") q.set("view", "teams");
+  if (sp.mode === "position") q.set("mode", "position");
+  const s = q.toString();
+  return `/standings${s ? `?${s}` : ""}#etapas`;
+}
+
+function Tab({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "true" : undefined}
+      className={`rounded px-3 py-1.5 text-sm font-semibold ${active ? "bg-elev-2 text-fg ring-1 ring-line-strong" : "text-muted hover:text-fg"}`}
+    >
+      {children}
+    </Link>
+  );
+}
+
+export default async function StandingsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
+  const view: "drivers" | "teams" = sp.view === "teams" ? "teams" : "drivers";
+  const mode: GridMode = sp.mode === "position" ? "position" : "points";
   const thisYear = new Date().getUTCFullYear();
   const season = /^\d{4}$/.test(sp.season ?? "") ? Math.min(Math.max(Number(sp.season), 1950), thisYear) : null;
   const key = season ?? "current";
@@ -36,12 +64,22 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
   const prevRound = rounds.length >= 2 ? rounds[rounds.length - 2]!.round : null;
   const prevRank = prevRound !== null ? (driverChamp.get(prevRound) ?? new Map<string, number>()) : new Map<string, number>();
 
-  const ds = dsR.ok ? dsR.data : null;
-  const cs = csR.ok ? csR.data : null;
+  const ds = dsR.ok ? freshDriverStandings(dsR.data, data) : null;
+  const cs = csR.ok ? freshConstructorStandings(csR.data, data) : null;
   const labels = eventsR.ok ? roundLabels(eventsR.data) : new Map();
   const roundInfo = rounds.map((r) => labels.get(r.round) ?? fallbackLabel(r.round, r.raceName));
   const xLabels = roundInfo.map((l) => l.short);
   const xTitles = roundInfo.map((l) => l.title);
+  const grid = buildSeasonGrid({
+    data,
+    kind: view === "teams" ? "team" : "driver",
+    events: eventsR.ok ? eventsR.data : [],
+    labels,
+    official:
+      view === "teams"
+        ? new Map((cs?.rows ?? []).map((r) => [r.constructor.id, { position: r.position, points: r.points }]))
+        : new Map((ds?.rows ?? []).map((r) => [r.driver.id, { position: r.position, points: r.points }])),
+  });
   const xDetails = rounds.map((r, i) => [roundInfo[i]!.detail, r.hasRace ? "" : "só a sprint tem resultado"].filter(Boolean).join(" · "));
   // Até 4 séries: limite da paleta categórica validada.
   const driverSeries: ChartSeries[] = (ds?.rows.slice(0, 4) ?? [])
@@ -63,8 +101,10 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
+      <SeasonStrip />
       <PageHeader kicker={`Temporada ${seasonNum}${ds ? ` · após a etapa ${ds.round}` : ""}`} title="Classificação">
-        Pontuação oficial de pilotos e construtores, com regras da própria temporada (inclui pontos de sprint quando aplicável).
+        Pontuação oficial de pilotos e construtores, etapa por etapa, com as regras da própria temporada (inclui pontos de sprint
+        quando aplicável).
       </PageHeader>
       <Container className="mt-8">
         <form method="get" className="mb-8 flex items-end gap-2">
@@ -75,6 +115,45 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
           <button className="rounded border border-line-strong px-3 py-1 text-sm hover:border-fg">Ver</button>
         </form>
 
+        {grid.rows.length > 0 && (
+          <section className="mb-12" aria-labelledby="etapas">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-line pb-3">
+              <h2 id="etapas" className="font-display text-2xl font-bold uppercase tracking-tight sm:text-3xl">
+                {view === "teams" ? "Equipes" : "Pilotos"} {seasonNum}
+                <span className="ml-2 text-base font-semibold normal-case tracking-normal text-muted">etapa por etapa</span>
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                <nav aria-label="Pilotos ou equipes" className="flex gap-1 rounded-md border border-line p-1">
+                  <Tab href={tabHref({ season, view: "drivers", mode })} active={view === "drivers"}>
+                    Pilotos
+                  </Tab>
+                  <Tab href={tabHref({ season, view: "teams", mode })} active={view === "teams"}>
+                    Equipes
+                  </Tab>
+                </nav>
+                <nav aria-label="O que mostrar nas células" className="flex gap-1 rounded-md border border-line p-1">
+                  <Tab href={tabHref({ season, view, mode: "points" })} active={mode === "points"}>
+                    Pontos
+                  </Tab>
+                  <Tab href={tabHref({ season, view, mode: "position" })} active={mode === "position"}>
+                    Posição
+                  </Tab>
+                </nav>
+              </div>
+            </div>
+            <SeasonGridLegend mode={mode} />
+            <SeasonGridTable
+              grid={grid}
+              kind={view === "teams" ? "team" : "driver"}
+              mode={mode}
+              caption={`${view === "teams" ? "Equipes" : "Pilotos"} ${seasonNum}: resultado de cada etapa`}
+              entityHref={(id) => `/head-to-head?season=${seasonNum}&kind=${view === "teams" ? "team" : "driver"}&id=${encodeURIComponent(id)}`}
+            />
+            <p className="mt-2 text-xs text-faint">Passe o mouse (ou toque) numa célula para ver o detalhe da corrida e da sprint. Clique no nome para analisar.</p>
+          </section>
+        )}
+
+        <h2 className="mb-4 font-display text-xl font-bold uppercase text-muted">Classificação oficial</h2>
         <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr]">
           <section aria-labelledby="drivers">
             <SectionHeading id="drivers" title="Pilotos" />
@@ -96,8 +175,8 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
                     </tr>
                   </thead>
                   <tbody>
-                    {dsR.data.rows.map((r) => {
-                      const leader = dsR.data.rows[0]!.points;
+                    {ds!.rows.map((r) => {
+                      const leader = ds!.rows[0]!.points;
                       const prev = prevRank.get(r.driver.id);
                       const delta = prev && r.position ? prev - r.position : 0;
                       return (
@@ -146,14 +225,14 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
                     </tr>
                   </thead>
                   <tbody>
-                    {csR.data.rows.map((r) => (
+                    {cs!.rows.map((r) => (
                       <tr key={r.constructor.id}>
                         <td className="font-semibold tabular">{r.positionText}</td>
                         <td className="font-medium">{r.constructor.name}</td>
                         <td className="num">{r.wins}</td>
                         <td className="num font-semibold">{r.points}</td>
                         <td className="num text-muted">
-                          {r.points === csR.data.rows[0]!.points ? "—" : `−${csR.data.rows[0]!.points - r.points}`}
+                          {r.points === cs!.rows[0]!.points ? "—" : `−${cs!.rows[0]!.points - r.points}`}
                         </td>
                       </tr>
                     ))}

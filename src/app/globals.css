@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Bandeiras: o Windows não tem emoji de bandeira e mostraria letras ("BR", "IT").
+   Esta fonte só cobre os caracteres de bandeira (unicode-range); o resto do texto não muda.
+   Twemoji Country Flags — código MIT (TalkJS), arte Twemoji CC BY 4.0. */
+@font-face {
+  font-family: "Twemoji Country Flags";
+  src: url("/fonts/TwemojiCountryFlags.woff2") format("woff2");
+  unicode-range: U+1F1E6-1F1FF, U+1F3F4, U+E0062-E0063, U+E0065, U+E0067, U+E006C, U+E006E, U+E0073-E0074, U+E0077, U+E007F;
+  font-display: swap;
+}
+
 /* ── Tokens ─────────────────────────────────────────────────────────
    Tema escuro é o padrão; claro via [data-theme="light"].            */
 :root {
@@ -65,8 +75,8 @@
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --color-info: var(--info);
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-barlow), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Twemoji Country Flags", var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Twemoji Country Flags", var(--font-barlow), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jbmono), ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
@@ -196,4 +206,123 @@ body {
   color: var(--text);
   background: transparent;
   border: 1px dashed var(--line-strong);
+}
+
+/* ── Tabela etapa por etapa ─────────────────────────────────────────
+   Faixas de resultado: ouro/prata/bronze/pontuou. O número sempre aparece. */
+:root {
+  --sg-win: rgba(212, 160, 23, 0.3);
+  --sg-p2: rgba(170, 178, 190, 0.26);
+  --sg-p3: rgba(176, 108, 52, 0.3);
+  --sg-points: rgba(255, 255, 255, 0.05);
+}
+:root[data-theme="light"] {
+  --sg-win: rgba(212, 160, 23, 0.32);
+  --sg-p2: rgba(120, 130, 145, 0.22);
+  --sg-p3: rgba(176, 108, 52, 0.26);
+  --sg-points: rgba(0, 0, 0, 0.035);
+}
+.sg-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+  min-width: 100%;
+}
+.sg-table th,
+.sg-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.45rem 0.5rem;
+  white-space: nowrap;
+}
+.sg-table thead th {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-elev-2);
+  border-bottom: 1px solid var(--line-strong);
+}
+.sg-sticky {
+  position: sticky;
+  z-index: 1;
+  background: var(--bg-elev);
+}
+thead .sg-sticky {
+  z-index: 2;
+  background: var(--bg-elev-2);
+}
+.sg-c0 {
+  left: 0;
+  width: 3rem;
+  min-width: 3rem;
+}
+.sg-c1 {
+  left: 3rem;
+  width: 12rem;
+  min-width: 12rem;
+  max-width: 12rem;
+}
+.sg-c2 {
+  left: 15rem;
+  width: 4rem;
+  min-width: 4rem;
+  border-right: 1px solid var(--line-strong);
+}
+@media (max-width: 640px) {
+  .sg-c1 {
+    width: 8.5rem;
+    min-width: 8.5rem;
+    max-width: 8.5rem;
+  }
+  .sg-c2 {
+    left: 11.5rem;
+  }
+}
+.sg-col {
+  text-align: center;
+  min-width: 3.25rem;
+}
+.sg-sprint {
+  margin-left: 2px;
+  font-size: 0.55rem;
+  color: var(--text-faint);
+  vertical-align: super;
+}
+.sg-cell {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  min-width: 3.25rem;
+}
+.sg-sub {
+  margin-left: 1px;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  vertical-align: sub;
+}
+.sg-win {
+  background: var(--sg-win);
+}
+.sg-p2 {
+  background: var(--sg-p2);
+}
+.sg-p3 {
+  background: var(--sg-p3);
+}
+.sg-points {
+  background: var(--sg-points);
+}
+.sg-dnf {
+  color: var(--text-faint);
+}
+/* Destaque da linha só nas colunas fixas: as células mantêm a cor do resultado. */
+.sg-table tbody tr:hover .sg-sticky {
+  background-color: var(--bg-elev-2);
+}
+.sg-swatch {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 2px;
+  border: 1px solid var(--line-strong);
 }

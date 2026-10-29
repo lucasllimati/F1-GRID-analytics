@@ -1,6 +1,6 @@
 import { driverName } from "./names";
 import { compareCountback } from "./points";
-import type { QualifyingRow, RaceResultRow, ResultOutcome, SessionResult } from "./types";
+import type { ConstructorStanding, DriverStanding, QualifyingRow, RaceResultRow, ResultOutcome, SessionResult, Standings } from "./types";
 
 // Análise comparativa de pilotos e equipes ao longo de uma temporada.
 // Tudo é derivado de resultados OFICIAIS publicados (corrida, sprint, classificação);
@@ -19,6 +19,8 @@ export type RoundStat = {
   qualiPos: number | null;
   /** Posição de largada efetiva (equipe: melhor carro). */
   grid: number | null;
+  /** Posições ganhas (+) ou perdidas (−) da largada à chegada; equipe: soma dos carros. null = nenhum carro classificado. */
+  gained: number | null;
   /** Pontos da etapa (corrida + sprint). */
   points: number;
   racePoints: number;
@@ -157,6 +159,22 @@ export function championshipPositions(data: SeasonData, kind: EntityKind): Map<n
   return out;
 }
 
+/** Pontos acumulados do líder do campeonato após cada etapa (para "diferença para o líder"). */
+export function leaderCumulative(data: SeasonData, kind: EntityKind): Map<number, number> {
+  const sprintBy = new Map(data.sprints.map((s) => [s.round, s]));
+  const raceBy = new Map(data.races.map((r) => [r.round, r]));
+  const pts = new Map<string, number>();
+  const out = new Map<number, number>();
+  for (const { round } of seasonRounds(data)) {
+    for (const r of [...(raceBy.get(round)?.rows ?? []), ...(sprintBy.get(round)?.rows ?? [])]) {
+      const id = idOf(kind, r);
+      pts.set(id, (pts.get(id) ?? 0) + r.points);
+    }
+    out.set(round, Math.max(0, ...pts.values()));
+  }
+  return out;
+}
+
 export function analyzeEntity(data: SeasonData, kind: EntityKind, id: string, champ = championshipPositions(data, kind)): EntityAnalysis | null {
   const rounds = seasonRounds(data);
   const sprintBy = new Map(data.sprints.map((s) => [s.round, s]));
@@ -200,6 +218,10 @@ export function analyzeEntity(data: SeasonData, kind: EntityKind, id: string, ch
       sprintPos: minOrNull(sRows.map((r) => r.position)),
       qualiPos: minOrNull(qRows.map((r) => r.position)),
       grid: minOrNull(rRows.map((r) => r.grid)),
+      gained: (() => {
+        const done = rRows.filter((r) => FINISHED.includes(r.outcome) && r.position !== null && r.grid !== null);
+        return done.length ? done.reduce((a, r) => a + (r.grid! - r.position!), 0) : null;
+      })(),
       points: racePoints + sprintPoints,
       racePoints,
       sprintPoints,
@@ -336,4 +358,69 @@ export function teammateDuels(data: SeasonData): TeammateDuel[] {
     });
   }
   return duels.sort((x, y) => y.points[0] + y.points[1] - (x.points[0] + x.points[1]));
+}
+
+/**
+ * A fonte às vezes atualiza a classificação de construtores depois da de pilotos e dos resultados.
+ * Se ela estiver atrás da última corrida publicada, recalculamos a partir dos resultados (soma dos
+ * carros, desempate por vitórias, 2º lugares…). Com a classificação em dia, ela prevalece.
+ */
+export function freshConstructorStandings(cs: Standings<ConstructorStanding>, data: SeasonData): Standings<ConstructorStanding> {
+  const lastRace = Math.max(0, ...data.races.map((r) => r.round));
+  // Só na era em que todo carro pontua para a equipe (2010+) e quando a fonte publicou alguma tabela:
+  // antes de 1958 não havia campeonato de construtores, e até os anos 70 só o melhor carro contava.
+  if (cs.round >= lastRace || lastRace === 0 || cs.rows.length === 0 || cs.season < 2010) return cs;
+  const champ = championshipPositions(data, "team").get(lastRace);
+  const acc = new Map<string, ConstructorStanding>();
+  for (const s of [...data.races, ...data.sprints]) {
+    for (const r of s.rows) {
+      const cur = acc.get(r.constructor.id) ?? { position: null, positionText: "", points: 0, wins: 0, constructor: r.constructor };
+      cur.points += r.points;
+      if (s.kind === "race" && r.position === 1) cur.wins++;
+      acc.set(r.constructor.id, cur);
+    }
+  }
+  const rows = [...acc.values()].sort((a, b) => (champ?.get(a.constructor.id) ?? 99) - (champ?.get(b.constructor.id) ?? 99));
+  rows.forEach((r, i) => {
+    r.position = i + 1;
+    r.positionText = String(i + 1);
+  });
+  return { season: cs.season, round: lastRace, rows };
+}
+
+/** Mesma regra para pilotos: classificação atrás da última corrida publicada → recalcula pelos resultados. */
+export function freshDriverStandings(ds: Standings<DriverStanding>, data: SeasonData): Standings<DriverStanding> {
+  const lastRace = Math.max(0, ...data.races.map((r) => r.round));
+  if (ds.round >= lastRace || lastRace === 0 || ds.rows.length === 0 || ds.season < 2010) return ds;
+  const champ = championshipPositions(data, "driver").get(lastRace);
+  const acc = new Map<string, DriverStanding>();
+  for (const s of [...data.races, ...data.sprints].sort((a, b) => a.round - b.round)) {
+    for (const r of s.rows) {
+      const cur = acc.get(r.driver.id) ?? { position: null, positionText: "", points: 0, wins: 0, driver: r.driver, constructors: [] };
+      cur.points += r.points;
+      if (s.kind === "race" && r.position === 1) cur.wins++;
+      if (!cur.constructors.some((c) => c.id === r.constructor.id)) cur.constructors.push(r.constructor);
+      acc.set(r.driver.id, cur);
+    }
+  }
+  const rows = [...acc.values()].sort((a, b) => (champ?.get(a.driver.id) ?? 99) - (champ?.get(b.driver.id) ?? 99));
+  rows.forEach((r, i) => {
+    r.position = i + 1;
+    r.positionText = String(i + 1);
+  });
+  return { season: ds.season, round: lastRace, rows };
+}
+
+/** Contagem de chegadas por posição em corridas (índice 0 = vitórias), para o desempate oficial. */
+export function finishCounts(data: SeasonData): Map<string, number[]> {
+  const out = new Map<string, number[]>();
+  for (const race of data.races) {
+    for (const r of race.rows) {
+      if (r.position === null) continue;
+      const arr = out.get(r.driver.id) ?? [];
+      arr[r.position - 1] = (arr[r.position - 1] ?? 0) + 1;
+      out.set(r.driver.id, arr);
+    }
+  }
+  return out;
 }

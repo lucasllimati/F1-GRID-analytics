@@ -18,6 +18,14 @@ Precedência quando houver mais de uma fonte (futuro): documento oficial da FIA 
 
 **Limitações conhecidas da Jolpica**: o grid de largada só aparece junto com o resultado da corrida; não há estado ao vivo; a classificação publicada pode atrasar algumas horas após a corrida.
 
+### Histórico desde 1950
+
+Gerado por `scripts/build-history.mjs` a partir da mesma Jolpica (CC BY-NC-SA 4.0): resultados de todas as corridas, classificação (pole) a partir de 1994, classificações finais de pilotos e construtores (desde 1958). Limitações da fonte, exibidas nas páginas: antes de 1994 a pole é quem largou em 1º; voltas mais rápidas só existem a partir de 2004; pontos de temporadas antigas seguem as regras da época (descartes incluídos). Carros divididos dos anos 50 contam uma largada por piloto e por corrida.
+
+### Onde assistir
+
+`src/lib/f1/broadcast.ts`, revisado manualmente (data no arquivo). Direitos e grade mudam: a página pede para confirmar na emissora.
+
 ## Feeds de notícias (28 fontes · verificadas em 2026-10-12)
 
 Cada feed foi testado com o parser do projeto: responde 200, itens com data e links do próprio domínio, e a matéria mais recente tem menos de 7 dias. "Multi" = cobre várias categorias; só itens que mencionam F1 (categoria, equipe, piloto ou chefe de equipe) entram.

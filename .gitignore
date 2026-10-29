@@ -14,3 +14,4 @@ prisma/*.db-journal
 
 # Anotações e credenciais locais (nunca versionar)
 .local/
+.cache/

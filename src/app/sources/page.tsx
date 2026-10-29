@@ -122,7 +122,18 @@ export default function SourcesPage() {
             </a>
             . {JOLPICA_INFO.licenseNote}
           </p>
+          <p>
+            O histórico desde 1950 (recordes, campeões, &quot;neste dia&quot;) também vem da Jolpica-F1, sob licença CC BY-NC-SA 4.0. Antes de
+            1994 a fonte não tem a sessão de classificação: a pole é o piloto que largou em 1º. Voltas mais rápidas só existem a partir de 2004.
+          </p>
           <p>Não usamos imagens, logotipos ou dados de telemetria protegidos.</p>
+          <p>
+            Bandeiras: fonte &quot;Twemoji Country Flags&quot; (código MIT, TalkJS), com arte do{" "}
+            <a href="https://github.com/twitter/twemoji" className="underline" target="_blank" rel="noopener noreferrer">
+              Twemoji
+            </a>{" "}
+            sob licença CC BY 4.0.
+          </p>
         </section>
       </Container>
     </>

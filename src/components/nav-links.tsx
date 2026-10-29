@@ -12,10 +12,13 @@ export type NavItem = { href: string; label: string; match?: string[]; exclude?:
 export const NAV: NavItem[] = [
   { href: "/race-center", label: "Race Center", match: ["/calendar/"] },
   { href: "/calendar", label: "Calendário", exclude: /^\/calendar\/\d{4}\/\d+/ },
+  { href: "/schedule", label: "Horários" },
   { href: "/results", label: "Resultados" },
   { href: "/standings", label: "Classificação" },
-  { href: "/championship-probabilities", label: "Probabilidades" },
+  { href: "/championship-probabilities", label: "Título" },
   { href: "/head-to-head", label: "Comparar" },
+  { href: "/records", label: "Recordes" },
+  { href: "/recaps", label: "Resumos" },
   { href: "/news", label: "Notícias" },
 ];
 

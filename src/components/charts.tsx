@@ -17,11 +17,32 @@ export type ChartSeries = {
 };
 
 /** Formatos nomeados: funções não podem ser passadas de componentes de servidor para de cliente. */
-export type ValueFormat = "number" | "position";
+export type ValueFormat = "number" | "position" | "signed";
 const FORMATTERS: Record<ValueFormat, (v: number) => string> = {
   number: (v) => v.toLocaleString("pt-BR"),
   position: (v) => `P${v}`,
+  signed: (v) => (v > 0 ? `+${v.toLocaleString("pt-BR")}` : v.toLocaleString("pt-BR")),
 };
+
+/** Escala com zero incluído; aceita valores negativos (ex.: pontos atrás do líder). Marcas em passos redondos, sempre passando pelo 0. */
+function signedRange(all: number[]): { yMin: number; yMax: number; ticks: number[] } {
+  const hi = Math.max(0, ...all);
+  const lo = Math.min(0, ...all);
+  if (lo === 0) {
+    const yMax = niceMax(Math.max(1, hi));
+    return { yMin: 0, yMax, ticks: [0, 0.2, 0.4, 0.6, 0.8, 1].map((f) => Math.round(yMax * f)) };
+  }
+  const raw = (hi - lo) / 5;
+  const pow = 10 ** Math.floor(Math.log10(raw));
+  const n = raw / pow;
+  // Pontos e posições são inteiros: passo mínimo 1 (evita marcas repetidas após arredondar).
+  const step = Math.max(1, (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow);
+  const yMin = Math.floor(lo / step) * step;
+  const yMax = hi > 0 ? Math.ceil(hi / step) * step : 0;
+  const ticks: number[] = [];
+  for (let t = yMin; t <= yMax + 1e-9; t += step) ticks.push(Math.round(t));
+  return { yMin, yMax, ticks };
+}
 
 const COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
 const DASH = ["", "7 4", "2 4", "10 4 2 4"];
@@ -218,16 +239,15 @@ export function TrendChart({
   if (n === 0 || all.length === 0) {
     return <p className="rounded border border-dashed border-line p-6 text-center text-sm text-muted">Sem dados para {title.toLowerCase()}.</p>;
   }
-  const yMax = invert ? Math.max(10, Math.ceil(Math.max(...all) / 5) * 5) : niceMax(Math.max(...all));
-  const yMin = invert ? 1 : 0;
+  const range = signedRange(all);
+  const yMax = invert ? Math.max(10, Math.ceil(Math.max(...all) / 5) * 5) : range.yMax;
+  const yMin = invert ? 1 : range.yMin;
   const x = (i: number) => PAD.l + (i / Math.max(1, n - 1)) * (W - PAD.l - PAD.r);
   const y = (v: number) => {
     const t = (v - yMin) / Math.max(1, yMax - yMin);
     return invert ? PAD.t + t * (H - PAD.t - PAD.b) : H - PAD.b - t * (H - PAD.t - PAD.b);
   };
-  const ticks = invert
-    ? [1, ...Array.from({ length: Math.floor(yMax / 5) }, (_, i) => (i + 1) * 5)]
-    : [0, 0.2, 0.4, 0.6, 0.8, 1].map((f) => Math.round(yMax * f));
+  const ticks = invert ? [1, ...Array.from({ length: Math.floor(yMax / 5) }, (_, i) => (i + 1) * 5)] : range.ticks;
 
   // Rótulos diretos no fim, afastados para não colidir.
   const ends = series
@@ -356,15 +376,14 @@ export function RoundBars({
   if (n === 0 || all.length === 0) {
     return <p className="rounded border border-dashed border-line p-6 text-center text-sm text-muted">Sem dados para {title.toLowerCase()}.</p>;
   }
-  const yMax = niceMax(Math.max(1, ...all));
+  const { yMin, yMax, ticks } = signedRange(all);
   const plotW = W - PAD.l - 16;
   const slot = plotW / n;
   const gap = 2;
   const barW = Math.max(2, (slot * 0.8 - gap * (series.length - 1)) / series.length);
   const cx = (i: number) => PAD.l + slot * i + slot / 2;
-  const y = (v: number) => H - PAD.b - (v / yMax) * (H - PAD.t - PAD.b);
-  const base = H - PAD.b;
-  const ticks = [0, 0.2, 0.4, 0.6, 0.8, 1].map((f) => Math.round(yMax * f));
+  const y = (v: number) => H - PAD.b - ((v - yMin) / (yMax - yMin)) * (H - PAD.t - PAD.b);
+  const base = y(0);
   const labelEvery = Math.ceil(n / 26); // todas as etapas de uma temporada cabem inclinadas
   // Hover usa o mesmo mapeamento do gráfico de linhas: ajusta índice pelo centro das colunas.
   const onMove = (e: PointerEvent<SVGSVGElement>) => {
@@ -400,17 +419,18 @@ export function RoundBars({
             <g key={t}>
               <line x1={PAD.l} x2={W - 16} y1={y(t)} y2={y(t)} stroke="var(--line)" />
               <text x={PAD.l - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill="var(--text-faint)">
-                {t}
+                {formatName === "signed" ? format(t) : t}
               </text>
             </g>
           ))}
-          {hover.idx !== null && <rect x={PAD.l + slot * hover.idx} y={PAD.t} width={slot} height={base - PAD.t} fill="var(--text)" opacity="0.05" />}
+          {hover.idx !== null && <rect x={PAD.l + slot * hover.idx} y={PAD.t} width={slot} height={H - PAD.b - PAD.t} fill="var(--text)" opacity="0.05" />}
           {xLabels.map((l, i) => (i % labelEvery === 0 || i === n - 1 ? <AxisLabel key={`${l}-${i}`} x={cx(i)} label={l} /> : null))}
           {series.map((s, si) =>
             s.values.map((v, i) => {
               if (!v) return null;
               const left = cx(i) - (barW * series.length + gap * (series.length - 1)) / 2 + si * (barW + gap);
               const top = y(v);
+              if (v < 0) return <rect key={`${s.id}-${i}`} x={left} y={base} width={barW} height={top - base} fill={COLORS[s.slot]} opacity="0.75" />;
               const r = Math.min(3, barW / 2, base - top);
               // Topo arredondado, base reta (ancorada no eixo).
               const d = `M${left},${base} V${top + r} Q${left},${top} ${left + r},${top} H${left + barW - r} Q${left + barW},${top} ${left + barW},${top + r} V${base} Z`;

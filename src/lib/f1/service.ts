@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache";
 import { logger } from "../log";
 import { CircuitOpenError } from "../net/resilient";
 import { F1_CACHE_TAG, JolpicaProvider } from "./providers/jolpica";
+import { freshConstructorStandings, freshDriverStandings } from "./compare";
 import { DEFAULT_ASSUMPTIONS, runChampionshipModel, type ModelOutput } from "./probability";
 import { driverName } from "./names";
 import { remainingScoringSessions } from "./schedule";
@@ -56,13 +57,15 @@ export async function load<T>(p: Promise<T>): Promise<Loaded<T>> {
 export { driverName } from "./names";
 
 async function computeModel(season: number): Promise<ModelOutput> {
-  const [events, ds, cs, races, sprints] = await Promise.all([
+  const [events, dsRaw, csRaw, races, sprints] = await Promise.all([
     f1.getSchedule(season),
     f1.getDriverStandings(season),
     f1.getConstructorStandings(season),
     f1.getSeasonResults(season, "race"),
     f1.getSeasonResults(season, "sprint"),
   ]);
+  const ds = freshDriverStandings(dsRaw, { races, sprints, qualis: [] });
+  const cs = freshConstructorStandings(csRaw, { races, sprints, qualis: [] });
   // Restante = sessões sem resultado publicado (consistente com os pontos da classificação oficial).
   const remaining = remainingScoringSessions(events, new Set(races.map((r) => r.round)), new Set(sprints.map((s) => s.round)));
   return runChampionshipModel(

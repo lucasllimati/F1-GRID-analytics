@@ -40,20 +40,30 @@ Comece sempre em `NEWS_PUBLISH_MODE="semi"` (tudo vai para revisão em `/admin`)
 | Comando | O que faz |
 |---|---|
 | `npm run dev` / `build` / `start` | Next.js |
-| `npm test` | 143 testes (fusos/DST, pontuação, modelo, RSS, deduplicação, política editorial, segurança, pipeline integrado) |
+| `npm test` | 169 testes (fusos/DST, pontuação, modelo, RSS, deduplicação, política editorial, segurança, pipeline integrado) |
 | `npm run lint` | checagem de tipos |
 | `npm run news:ingest` | monitora as 28 fontes (oficiais, internacionais, europeias e brasileiras) e agrupa pautas |
 | `npm run news:cycle` | ciclo completo (monitorar → redigir → checar → publicar/revisar) |
 | `npm run admin:create` | cria/atualiza usuário da redação |
 | `npm run ai:check` | testa a conexão com a IA configurada |
 | `npm run data:check` | valida a consistência dos dados esportivos da temporada contra a fonte |
+| `npm run data:history` | regenera o histórico desde 1950 (`src/data/f1-history.json`) — rodar uma vez por ano, após a última corrida (~1 h, respeita o limite da fonte) |
 | `npm run smoke` | teste de fumaça das rotas (use `SMOKE_BASE_URL` para produção) |
 | `npm run db:migrate` / `db:deploy` | migrations (local, SQLite) |
 | `npm run db:pg:sync` / `db:pg:migration -- nome` | schema e migrations de produção (PostgreSQL) |
 
 ## Páginas
 
-`/` · `/race-center` · `/calendar` · `/calendar/[ano]/[etapa]` (Race Center da etapa) · `/results` (vencedores, poles e voltas mais rápidas da temporada) · `/standings` · `/championship-probabilities` · `/head-to-head` (comparar pilotos/equipes) · `/news` · `/news/[slug]` · `/sources` · `/methodology` · `/about` · `/privacy` · `/feed.xml` · `/admin`
+`/` · `/race-center` · `/calendar` · `/calendar/[ano]/[etapa]` (Race Center da etapa) · `/schedule` (horários e onde assistir) · `/calendar.ics` (agenda assinável) · `/results` (vencedores, poles e voltas mais rápidas da temporada) · `/standings` (tabela etapa por etapa) · `/championship-probabilities` (título: cenários, simulador e probabilidades) · `/head-to-head` (comparar pilotos/equipes) · `/records` (recordes e campeões desde 1950) · `/recaps` (resumo de cada corrida) · `/news` · `/news/[slug]` · `/sources` · `/methodology` · `/about` · `/privacy` · `/feed.xml` · `/admin`
+
+### Estatísticas
+
+- **Etapa por etapa** (`/standings`): pilotos ou equipes × GPs, pontos e posição em cada etapa, cor por resultado, sprints marcadas.
+- **Título**: quem ainda pode ser campeão, em que GP o líder pode fechar e com quais resultados (contas exatas, com desempate por vitórias), quem saiu da disputa e quando, e simulador "e se…?" com link compartilhável.
+- **Comparar**: pontos, posição, diferença para o líder, largada × chegada, qualifying, sprints e temporadas da carreira.
+- **Recordes**: títulos, vitórias, poles, pódios, voltas mais rápidas e corridas desde 1950 (temporada atual somada ao vivo), recordes em jogo, brasileiros na F1, campeões de cada ano e "neste dia".
+- **Resumos**: texto automático de cada corrida a partir dos resultados oficiais (vantagem, recuperações, abandonos, campeonato).
+- **Horários**: sessões no fuso do leitor, onde assistir no Brasil e calendário .ics para Google/Apple/Outlook.
 
 ## Documentação
 
@@ -73,4 +83,4 @@ Monitoramento: `GET /api/health` (para um monitor de uptime). CI: `.github/workf
 - Redação com APIs reais (Claude ou Gemini) ainda não validada neste ambiente (sem chave); o adaptador foi testado com respostas simuladas.
 - Dados esportivos lidos da Jolpica com cache, sem persistência própria nem histórico de previsões.
 - Modelo de probabilidade sem backtest publicado.
-- F2/F3, estatísticas históricas, perfis, head-to-head, newsletter e afiliados ainda não implementados — essas seções não aparecem na navegação para não exibir páginas vazias.
+- F2/F3, perfis de piloto, newsletter e afiliados ainda não implementados — essas seções não aparecem na navegação para não exibir páginas vazias.

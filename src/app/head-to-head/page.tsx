@@ -5,6 +5,7 @@ import { Card, Container, EmptyState, ErrorState, PageHeader, SectionHeading, So
 import {
   analyzeEntity,
   championshipPositions,
+  leaderCumulative,
   headToHead,
   seasonRounds,
   seasonEntities,
@@ -14,6 +15,7 @@ import {
   type SeasonData,
   type Summary,
 } from "@/lib/f1/compare";
+import { HISTORY } from "@/lib/f1/history";
 import { fallbackLabel, roundLabels } from "@/lib/f1/round-labels";
 import { f1, load } from "@/lib/f1/service";
 import { OUTCOME_LABEL } from "@/lib/f1/types";
@@ -125,6 +127,25 @@ export default async function HeadToHeadPage({ searchParams }: { searchParams: P
       notes: note ? a.rounds.map((_, i) => note(a, i)) : undefined,
     }));
 
+  const leaderPts = leaderCumulative(data, kind);
+  // Carreira: posição no campeonato em cada temporada (histórico + temporada exibida, se ainda não está nele).
+  const hist = kind === "driver" ? HISTORY.drivers : HISTORY.teams;
+  const careers = analyses.map((a) => {
+    const seasons: Record<string, { pos: number | null }> = { ...(hist.find((x) => x.id === a.id)?.seasons ?? {}) };
+    const lastPos = a.rounds.at(-1)?.champPos ?? null;
+    if (season > HISTORY.lastSeason && lastPos !== null) seasons[String(season)] = { pos: lastPos };
+    return { a, seasons };
+  });
+  const careerYears = [...new Set(careers.flatMap((c) => Object.keys(c.seasons).map(Number)))].sort((x, y) => x - y);
+  const careerFrom = careerYears[0];
+  const careerAxis = careerFrom !== undefined ? Array.from({ length: careerYears.at(-1)! - careerFrom + 1 }, (_, i) => careerFrom + i) : [];
+  const careerSeries: ChartSeries[] = careers.map(({ a, seasons }, slot) => ({
+    id: a.id,
+    label: kind === "driver" ? (a.name.split(" ").slice(-1)[0] ?? a.name) : a.name,
+    slot,
+    values: careerAxis.map((y) => seasons[String(y)]?.pos ?? null),
+    notes: careerAxis.map((y) => (seasons[String(y)] ? null : "não correu")),
+  }));
   const sprintIdx = allRounds.map((r, i) => (r.hasSprint ? i : -1)).filter((i) => i >= 0);
   const sprintSeries = series((a, i) => a.rounds[i]!.sprintPos).map((s) => ({ ...s, values: sprintIdx.map((i) => s.values[i] ?? null) }));
   const h2h = analyses.length >= 2 ? headToHead(analyses[0]!, analyses[1]!) : null;
@@ -249,6 +270,34 @@ export default async function HeadToHeadPage({ searchParams }: { searchParams: P
                 />
               </Card>
               <Card className="p-4 sm:p-6">
+                <TrendChart
+                  title="Diferença para o líder"
+                  caption="Pontos atrás do líder do campeonato após cada etapa (0 = liderando)."
+                  series={series((a, i) => {
+                    const r = a.rounds[i]!;
+                    return r.cumulative - (leaderPts.get(r.round) ?? r.cumulative);
+                  })}
+                  xLabels={xLabels}
+                  xTitles={xTitles}
+                  xDetails={xDetails}
+                  format="signed"
+                />
+              </Card>
+              <Card className="p-4 sm:p-6">
+                <RoundBars
+                  title="Largada × chegada"
+                  caption={`Posições ganhas (+) ou perdidas (−) da largada à bandeirada${kind === "team" ? ", somando os dois carros" : ""}. Só corridas em que terminou classificado.`}
+                  series={series((a, i) => {
+                    const r = a.rounds[i]!;
+                    return r.gained;
+                  })}
+                  xLabels={xLabels}
+                  xTitles={xTitles}
+                  xDetails={xDetails}
+                  format="signed"
+                />
+              </Card>
+              <Card className="p-4 sm:p-6">
                 <RoundBars
                   title="Pontos por etapa"
                   caption="Corrida + sprint de cada fim de semana."
@@ -306,6 +355,20 @@ export default async function HeadToHeadPage({ searchParams }: { searchParams: P
                 </Card>
               )}
             </div>
+
+            {careerAxis.length >= 2 && (
+              <Card className="mt-10 p-4 sm:p-6">
+                <TrendChart
+                  title="Temporadas"
+                  caption={`Posição final no campeonato em cada ano${season > HISTORY.lastSeason ? ` (${season}: posição atual)` : ""}. Interrupção = não correu.`}
+                  series={careerSeries}
+                  xLabels={careerAxis.map(String)}
+                  xTitles={careerAxis.map((y) => `Temporada ${y}`)}
+                  invert
+                  format="position"
+                />
+              </Card>
+            )}
 
             {/* ── Confronto direto ── */}
             {h2h && (
