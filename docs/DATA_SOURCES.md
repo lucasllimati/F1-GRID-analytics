@@ -20,7 +20,7 @@ Precedência quando houver mais de uma fonte (futuro): documento oficial da FIA 
 
 ### Histórico desde 1950
 
-Gerado por `scripts/build-history.mjs` a partir da mesma Jolpica (CC BY-NC-SA 4.0): resultados de todas as corridas, classificação (pole) a partir de 1994, classificações finais de pilotos e construtores (desde 1958). Limitações da fonte, exibidas nas páginas: antes de 1994 a pole é quem largou em 1º; voltas mais rápidas só existem a partir de 2004; pontos de temporadas antigas seguem as regras da época (descartes incluídos). Carros divididos dos anos 50 contam uma largada por piloto e por corrida.
+Gerado por `scripts/build-history.mjs` a partir da mesma Jolpica (CC BY-NC-SA 4.0): resultados de todas as corridas, classificação (pole) a partir de 1994, classificações finais de pilotos e construtores (desde 1958). Pole = quem largou em 1º (regra da FIA quando o mais rápido é punido ou excluído; confere com os números oficiais de Hamilton 104, Schumacher 68, Senna 65); sem ninguém em 1º no grid, vale o mais rápido da classificação (disponível desde 1994). Limitações da fonte, exibidas nas páginas: nos anos 50 há poles sem registro de classificação (Fangio: 26 na fonte, 29 oficiais); voltas mais rápidas só existem a partir de 2004; pontos de temporadas antigas seguem as regras da época (descartes incluídos). Carros divididos dos anos 50 contam uma largada por piloto e por corrida.
 
 ### Onde assistir
 
@@ -41,7 +41,7 @@ Cada feed foi testado com o parser do projeto: responde 200, itens com data e li
 | Internacional | The Race | en | the-race | Multi |
 | Internacional | Sky Sports F1 | en | sky | F1 · datas em "BST" (tratado pelo parser) |
 | Internacional | The Guardian | en | guardian | F1 |
-| Internacional | ESPN F1 | en | espn | F1 |
+| Brasil | ESPN Brasil (F1) — o espn.com bloqueia leitores de RSS desde 2026-10-30 | pt-BR | espn | F1 |
 | Internacional | RACER | en | racer | F1 |
 | Internacional | Crash.net | en | crash | F1 |
 | Internacional | PlanetF1 | en | planet-sport | Multi |

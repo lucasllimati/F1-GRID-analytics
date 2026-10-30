@@ -98,14 +98,16 @@ describe("configuração da cadeia", () => {
   const base = { NEWS_AI_MODEL: "", ANTHROPIC_API_KEY: "", GEMINI_API_KEY: "g", NEWS_AI_BASE_URL: "", NEWS_AI_API_KEY: "" };
 
   it("aceita modelos do OpenRouter com ':' no nome", () => {
-    const { specs, invalid } = parseSpecs("gemini:gemini-3.6-flash, openrouter:nvidia/nemotron-3-super-120b-a12b:free");
+    const { specs, invalid } = parseSpecs("gemini:gemini-3.6-flash, openrouter:nvidia/nemotron-3.5-super-vl:free");
     expect(invalid).toEqual([]);
-    expect(specs[1]).toEqual({ provider: "openrouter", model: "nvidia/nemotron-3-super-120b-a12b:free" });
+    expect(specs[1]).toEqual({ provider: "openrouter", model: "nvidia/nemotron-3.5-super-vl:free" });
   });
 
   it("com chave do OpenRouter, a reserva padrão termina num modelo gratuito de outra empresa", () => {
     const s = createEditorialAI({ ...base, NEWS_AI_PROVIDER: "gemini", OPENROUTER_API_KEY: "or" });
-    expect(s.model).toBe("gemini-3.8-flash → gemini-3.6-flash → gemini-3.5-flash-lite → openrouter nvidia/nemotron-3-super-120b-a12b:free");
+    expect(s.model).toBe(
+      "gemini-3.8-flash → gemini-3.6-flash → gemini-3.5-flash-lite → openrouter nvidia/nemotron-3.5-super-vl:free → openrouter google/gemma-4-31b-it:free",
+    );
   });
 
   it("provedores sem chave são pulados e listados, sem quebrar a cadeia", () => {
@@ -117,5 +119,23 @@ describe("configuração da cadeia", () => {
   it("entrada inválida não ecoa o valor (pode ser uma chave colada errado)", () => {
     const s = createEditorialAI({ ...base, NEWS_AI_PROVIDER: "gemini", NEWS_AI_FALLBACKS: "AQ.FAKE_chave_colada_errado" });
     expect(JSON.stringify(s.skipped)).not.toContain("FAKE_chave");
+  });
+});
+
+describe("OpenRouter só gratuito", () => {
+  it("recusa modelo pago do OpenRouter, mesmo configurado à mão", async () => {
+    const { createEditorialAI } = await import("@/lib/news/ai-factory");
+    const s = createEditorialAI({
+      NEWS_AI_PROVIDER: "gemini", NEWS_AI_MODEL: "", ANTHROPIC_API_KEY: "", GEMINI_API_KEY: "g", NEWS_AI_BASE_URL: "", NEWS_AI_API_KEY: "",
+      NEWS_AI_FALLBACKS: "openrouter:nvidia/nemotron-3-super-120b-a12b,openrouter:google/gemma-4-31b-it:free", OPENROUTER_API_KEY: "k",
+    });
+    expect(s.model).toBe("gemini-3.8-flash → openrouter google/gemma-4-31b-it:free");
+    expect(s.skipped?.join(" ")).toMatch(/só modelos gratuitos/);
+  });
+});
+
+describe("modelo indisponível (404)", () => {
+  it("sai da cadeia pelo resto do ciclo, como chave inválida", () => {
+    expect(classifyHttp(404, '{"error":{"message":"This model is unavailable for free."}}')).toBe("auth");
   });
 });

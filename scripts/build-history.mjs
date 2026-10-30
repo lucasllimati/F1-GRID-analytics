@@ -132,7 +132,10 @@ async function main() {
       const countedDrivers = new Set();
       const podiumDrivers = new Set();
       const won = race.Results.find((r) => r.position === "1");
-      const poleRow = qualis.get(race.round) ?? race.Results.find((r) => r.grid === "1");
+      // Pole oficial = quem larga em 1º: quando o mais rápido da classificação é punido ou excluído,
+      // a FIA credita a pole ao herdeiro (ex.: Spa 2022, Mônaco 2012). Sem ninguém em 1º no grid
+      // (pole largando do pit lane), vale o 1º da classificação.
+      const poleRow = race.Results.find((r) => r.grid === "1") ?? qualis.get(race.round);
       for (const r of race.Results) {
         const d = driver(r.Driver);
         const t = team(r.Constructor);
@@ -212,7 +215,7 @@ async function main() {
     firstSeason: FIRST,
     lastSeason: UNTIL,
     notes: {
-      poles: "1994+: 1º na classificação; antes: largou em 1º (a fonte não tem a sessão de classificação).",
+      poles: "Pole = quem largou em 1º (como a FIA credita quando o mais rápido é punido); sem ninguém em 1º no grid, o mais rápido da classificação (dado disponível desde 1994).",
       fastestLaps: "A fonte só registra voltas mais rápidas a partir de 2004.",
     },
     seasons,

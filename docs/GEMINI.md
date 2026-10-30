@@ -88,12 +88,12 @@ gemini-3.8-flash → gemini-3.6-flash → gemini-3.5-flash-lite → (OpenRouter 
    OPENROUTER_API_KEY="sk-or-..."
    ```
 
-Pronto: o modelo `nvidia/nemotron-3-super-120b-a12b:free` entra no fim da cadeia. Limites gratuitos do OpenRouter: 20 pedidos/min e 50 pedidos/dia (1.000/dia se a conta tiver ao menos US$ 10 de créditos comprados). Cada notícia usa ~2 pedidos (redação + checagem).
+Pronto: os modelos gratuitos `nvidia/nemotron-3.5-super-vl:free` e `google/gemma-4-31b-it:free` entram no fim da cadeia. O site **só aceita modelos terminados em `:free`** no OpenRouter (nunca gera cobrança). Modelos gratuitos mudam com frequência — se o `npm run ai:check` mostrar "unavailable for free", troque em `NEWS_AI_FALLBACKS` por outro da lista https://openrouter.ai/models?max_price=0. Limites gratuitos do OpenRouter: 20 pedidos/min e 50 pedidos/dia (1.000/dia se a conta tiver ao menos US$ 10 de créditos comprados). Cada notícia usa ~2 pedidos (redação + checagem).
 
 Para escolher a cadeia manualmente, use `NEWS_AI_FALLBACKS` (ordem = prioridade; `none` desliga):
 
 ```env
-NEWS_AI_FALLBACKS="gemini:gemini-3.6-flash,openrouter:google/gemma-4-31b-it:free,openrouter:nvidia/nemotron-3-super-120b-a12b:free"
+NEWS_AI_FALLBACKS="gemini:gemini-3.6-flash,openrouter:google/gemma-4-31b-it:free,openrouter:nvidia/nemotron-3.5-super-vl:free"
 ```
 
 > Não existe "token gratuito compartilhado" entre empresas: cada provedor exige a **sua** chave (todas gratuitas aqui). O sistema só alterna entre as que você configurar.

@@ -123,8 +123,9 @@ export default function SourcesPage() {
             . {JOLPICA_INFO.licenseNote}
           </p>
           <p>
-            O histórico desde 1950 (recordes, campeões, &quot;neste dia&quot;) também vem da Jolpica-F1, sob licença CC BY-NC-SA 4.0. Antes de
-            1994 a fonte não tem a sessão de classificação: a pole é o piloto que largou em 1º. Voltas mais rápidas só existem a partir de 2004.
+            O histórico desde 1950 (recordes, campeões, &quot;neste dia&quot;) também vem da Jolpica-F1, sob licença CC BY-NC-SA 4.0. A pole é
+            de quem largou em 1º, como a FIA credita quando o mais rápido é punido; nos anos 50 a fonte não tem a classificação, então alguns
+            números antigos podem diferir dos oficiais. Voltas mais rápidas só existem a partir de 2004.
           </p>
           <p>Não usamos imagens, logotipos ou dados de telemetria protegidos.</p>
           <p>

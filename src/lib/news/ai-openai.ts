@@ -60,6 +60,8 @@ function jsonSchemaFor(schema: z.ZodType): Record<string, unknown> {
 export function classifyHttp(status: number, body: string): FailureKind {
   if (status === 401 || status === 403) return "auth";
   if (status === 402) return "quota"; // sem créditos (OpenRouter)
+  // Modelo inexistente ou que deixou de ser gratuito: configuração, não adianta insistir neste ciclo.
+  if (status === 404) return "auth";
   if (status === 429) return /per ?day|perday|daily|per-day|quota exceeded for metric.*day/i.test(body) ? "quota" : "rate_limit";
   if (status >= 500) return "overloaded";
   return "bad_request";

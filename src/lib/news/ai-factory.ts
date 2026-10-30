@@ -17,8 +17,16 @@ export const GROQ_BASE_URL = "https://api.groq.com/openai/v1/";
  * disponíveis com a mesma chave quando o principal esgota.
  */
 export const DEFAULT_GEMINI_FALLBACKS = ["gemini:gemini-3.6-flash", "gemini:gemini-3.5-flash-lite"];
-/** Modelo gratuito do OpenRouter com saída estruturada (verificado em 2026-10-13). */
-export const DEFAULT_OPENROUTER_FREE_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
+/**
+ * Modelos gratuitos do OpenRouter com saída estruturada, de empresas diferentes (verificados em
+ * 2026-10-30). A lista de gratuitos muda com frequência: `npm run ai:check` mostra se ainda respondem.
+ */
+export const DEFAULT_OPENROUTER_FREE_MODELS = ["nvidia/nemotron-3.5-super-vl:free", "google/gemma-4-31b-it:free"];
+
+/** Só modelos gratuitos do OpenRouter: nunca geramos cobrança, mesmo que a conta tenha créditos. */
+export function isFreeOpenRouterModel(model: string): boolean {
+  return model.endsWith(":free");
+}
 
 export type ProviderName = "anthropic" | "gemini" | "openai_compatible" | "openrouter" | "groq";
 
@@ -76,7 +84,8 @@ function buildLink(s: Spec, c: AiConfig, chained: boolean): { link: ChainLink } 
       return { link: { name: model, ai: new OpenAICompatibleEditorialAI({ baseUrl: GEMINI_BASE_URL, apiKey: c.GEMINI_API_KEY, model, label: "gemini", ...quick }) } };
     }
     case "openrouter": {
-      const model = s.model || DEFAULT_OPENROUTER_FREE_MODEL;
+      const model = s.model || DEFAULT_OPENROUTER_FREE_MODELS[0]!;
+      if (!isFreeOpenRouterModel(model)) return { skip: `openrouter ${model}: só modelos gratuitos (terminados em ":free") são aceitos` };
       if (!c.OPENROUTER_API_KEY) return { skip: `openrouter ${model}: OPENROUTER_API_KEY ausente` };
       return {
         link: { name: `openrouter ${model}`, ai: new OpenAICompatibleEditorialAI({ baseUrl: OPENROUTER_BASE_URL, apiKey: c.OPENROUTER_API_KEY, model, label: "openrouter", ...quick }) },
@@ -133,7 +142,7 @@ export function createEditorialAI(c: AiConfig): AiSelection {
     specs.push(...parsed.specs);
     for (const p of parsed.invalid) skipped.push(`entrada inválida em NEWS_AI_FALLBACKS (${p})`);
     // Com chave do OpenRouter e reserva padrão, inclui um modelo gratuito de outra empresa no fim.
-    if (!fb && c.OPENROUTER_API_KEY) specs.push({ provider: "openrouter", model: DEFAULT_OPENROUTER_FREE_MODEL });
+    if (!fb && c.OPENROUTER_API_KEY) for (const model of DEFAULT_OPENROUTER_FREE_MODELS) specs.push({ provider: "openrouter", model });
   }
 
   const chained = specs.length > 1;

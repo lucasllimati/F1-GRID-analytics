@@ -111,8 +111,8 @@ export function combineHistory(h: History, live: LiveSeason | null): Combined {
         if (r.fastestLapRank === 1) d.fastestLaps++;
         d.points += r.points;
       }
-      const pole = qualiBy.get(race.round) ?? null;
-      const poleRow = pole ?? race.rows.find((r) => r.grid === 1);
+      // Mesma regra do histórico: pole oficial = quem larga em 1º; sem ninguém em 1º, o mais rápido da classificação.
+      const poleRow = race.rows.find((r) => r.grid === 1) ?? qualiBy.get(race.round) ?? null;
       // O pole pode não constar na corrida (retirado antes da largada): conta só se o conhecemos.
       if (poleRow) {
         const pd = drivers.get(poleRow.driver.id);

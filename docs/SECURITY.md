@@ -20,11 +20,13 @@
 | Abuso de API externa | Limitador (2 simultâneas, ≥300 ms), backoff com jitter, disjuntor | `src/lib/net/resilient.ts` |
 | Health check | `/api/health` expõe só estados agregados (sem erros internos) | `api/health` |
 
-## Dependências (npm audit, 2026-10-11)
+## Dependências (npm audit, 2026-10-30)
 
 | Pacote | Situação |
 |---|---|
 | `postcss` (via Next 15) | **Corrigido** por `overrides` → `^8.5.29` |
+| `next` 15.5.27 (crítico: RCE no otimizador de imagens com SVG, GHSA-2464-fhr4-w9xw; DoS em Server Actions, GHSA-p3m5-59mp-jv5r) | **Corrigido** em 2026-10-30 → `~15.5.28`. O site não usa `next/image` nem SVG no otimizador; a exposição era baixa, mas o CI bloqueava. |
+| `zod` < 4.6.6 (alto: memória em coleções grandes) | **Corrigido** → `^4.6.7`. |
 | `deepmerge-ts` (via `@prisma/config`) | **Risco aceito**: só processa a configuração local do Prisma (entrada confiável); a correção automática rebaixaria o Prisma. Reavaliar no upgrade do Prisma. |
 
 O CI bloqueia o merge em vulnerabilidades **críticas** (`npm audit --audit-level=critical`).
