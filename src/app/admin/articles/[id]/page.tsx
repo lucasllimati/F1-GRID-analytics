@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArticleBody } from "@/components/article-body";
+import { SubmitButton } from "@/components/submit-button";
 import { Badge, Card, Container, SectionHeading } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -37,7 +38,9 @@ export default async function ReviewPage({ params, searchParams }: { params: Pro
   if (!a) notFound();
   const status = a.status as ArticleStatus;
   const reasons = JSON.parse(a.reviewReasons) as string[];
-  const canPublish = canTransition(status, "published") && (!a.sensitive || user.role === "admin");
+  // Já publicada: não há o que aprovar (edições têm o próprio botão).
+  const canApprove = status !== "published" && canTransition(status, "published");
+  const canPublish = canApprove && (!a.sensitive || user.role === "admin");
   const audits = await db.auditLog.findMany({ where: { entity: "article", entityId: id }, orderBy: { createdAt: "desc" }, take: 20 });
 
   return (
@@ -81,12 +84,12 @@ export default async function ReviewPage({ params, searchParams }: { params: Pro
 
           <SectionHeading title="Ações" />
           <div className="space-y-4">
-            {canTransition(status, "published") && (
+            {canApprove && (
               <form action={approveAction}>
                 <input type="hidden" name="id" value={a.id} />
-                <button disabled={!canPublish} className="rounded bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">
+                <SubmitButton disabled={!canPublish} pending="Publicando…" className="rounded bg-accent px-4 py-2 text-sm font-semibold text-white">
                   Aprovar e publicar
-                </button>
+                </SubmitButton>
                 {!canPublish && <span className="ml-2 text-xs text-warn">Requer administrador (tema sensível).</span>}
               </form>
             )}
@@ -94,20 +97,26 @@ export default async function ReviewPage({ params, searchParams }: { params: Pro
               <form action={rejectAction} className="flex flex-wrap gap-2">
                 <input type="hidden" name="id" value={a.id} />
                 <input name="reason" required minLength={3} maxLength={500} placeholder="Motivo da rejeição" className="min-w-64 flex-1 rounded border border-line bg-bg px-2 py-1.5 text-sm" />
-                <button className="rounded border border-line-strong px-3 py-1.5 text-sm">Rejeitar</button>
+                <SubmitButton pending="Rejeitando…" className="rounded border border-line-strong px-3 py-1.5 text-sm">
+                  Rejeitar
+                </SubmitButton>
               </form>
             )}
             {canTransition(status, "retracted") && (
               <form action={retractAction} className="flex flex-wrap gap-2">
                 <input type="hidden" name="id" value={a.id} />
                 <input name="note" required minLength={10} maxLength={500} placeholder="Nota pública de despublicação" className="min-w-64 flex-1 rounded border border-line bg-bg px-2 py-1.5 text-sm" />
-                <button className="rounded border border-accent px-3 py-1.5 text-sm text-accent">Despublicar</button>
+                <SubmitButton pending="Despublicando…" className="rounded border border-accent px-3 py-1.5 text-sm text-accent">
+                  Despublicar
+                </SubmitButton>
               </form>
             )}
             {(status === "rejected" || status === "failed" || status === "retracted") && (
               <form action={reopenAction}>
                 <input type="hidden" name="id" value={a.id} />
-                <button className="rounded border border-line px-3 py-1.5 text-sm">Devolver para revisão</button>
+                <SubmitButton pending="Devolvendo…" className="rounded border border-line px-3 py-1.5 text-sm">
+                  Devolver para revisão
+                </SubmitButton>
               </form>
             )}
           </div>
@@ -138,7 +147,9 @@ export default async function ReviewPage({ params, searchParams }: { params: Pro
                   <input name="correction" maxLength={500} className="mt-1 w-full rounded border border-line bg-bg px-2 py-1.5" />
                 </label>
               )}
-              <button className="rounded bg-fg px-4 py-2 text-sm font-semibold text-bg">Salvar versão</button>
+              <SubmitButton pending="Salvando…" className="rounded bg-fg px-4 py-2 text-sm font-semibold text-bg">
+                Salvar versão
+              </SubmitButton>
             </form>
           </details>
         </div>

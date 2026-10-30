@@ -177,6 +177,16 @@ describe("pipeline da redação (integração)", () => {
     expect(await db.article.count({ where: { status: "in_review" } })).toBe(2);
   });
 
+  it("aprovar duas vezes a mesma matéria: a segunda é recusada, sem registro duplicado", async () => {
+    const { approveAndPublish, EditorialError } = await import("@/lib/news/editorial");
+    const a = await db.article.findFirstOrThrow({ where: { status: "in_review", sensitive: false } });
+    const admin = await db.adminUser.create({ data: { email: "aprova@teste.local", name: "Teste", role: "admin", passwordHash: "x" } });
+    await approveAndPublish(db, { id: admin.id, role: "admin" }, a.id);
+    await expect(approveAndPublish(db, { id: admin.id, role: "admin" }, a.id)).rejects.toBeInstanceOf(EditorialError);
+    expect(await db.auditLog.count({ where: { entityId: a.id, action: "article.approved_published" } })).toBe(1);
+    expect((await db.article.findUniqueOrThrow({ where: { id: a.id } })).status).toBe("published");
+  });
+
   it("ciclo travado por processo encerrado é liberado após a janela da trava", async () => {
     vi.stubGlobal("fetch", mockFetch());
     const stale = await db.ingestionRun.create({

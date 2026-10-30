@@ -32,6 +32,8 @@ export async function approveAndPublish(db: PrismaClient, actor: Actor, id: stri
   if (a.sensitive && actor.role !== "admin") {
     throw new EditorialError("Tema sensível: somente um administrador pode publicar este texto.");
   }
+  // "publicado → publicado" existe para edições; aprovar de novo não faz sentido (clique duplo).
+  if (a.status === "published") throw new EditorialError("Esta matéria já está publicada.");
   assertTransition(a.status, "published");
   await db.article.update({
     where: { id },
