@@ -42,6 +42,29 @@ export async function approveAndPublish(db: PrismaClient, actor: Actor, id: stri
   await log(db, actor, "article.approved_published", id, { previous: a.status });
 }
 
+export type BulkApproval = { approved: number; skipped: { headline: string; reason: string }[] };
+
+/**
+ * Aprova de uma vez as matérias da fila que o editor estava vendo (`ids`). Só publica o que ainda
+ * está "em revisão" — o que chegou depois de a página carregar não entra sem ser visto — e mantém
+ * as regras de cada aprovação (tema sensível só com administrador).
+ */
+export async function approveAll(db: PrismaClient, actor: Actor, ids: string[]): Promise<BulkApproval> {
+  const unique = [...new Set(ids)].slice(0, 100);
+  const rows = await db.article.findMany({ where: { id: { in: unique }, status: "in_review" }, select: { id: true, headline: true } });
+  const out: BulkApproval = { approved: 0, skipped: [] };
+  for (const r of rows) {
+    try {
+      await approveAndPublish(db, actor, r.id);
+      out.approved++;
+    } catch (err) {
+      out.skipped.push({ headline: r.headline, reason: err instanceof EditorialError ? err.message : "falha ao publicar" });
+    }
+  }
+  if (out.approved > 0) await log(db, actor, "article.bulk_approved", "queue", { approved: out.approved, skipped: out.skipped.length });
+  return out;
+}
+
 export async function reject(db: PrismaClient, actor: Actor, id: string, reason: string) {
   const r = z.string().trim().min(3).max(500).safeParse(reason);
   if (!r.success) throw new EditorialError("Informe o motivo da rejeição (3–500 caracteres).");

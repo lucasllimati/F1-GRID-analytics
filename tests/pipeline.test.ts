@@ -187,6 +187,26 @@ describe("pipeline da redação (integração)", () => {
     expect((await db.article.findUniqueOrThrow({ where: { id: a.id } })).status).toBe("published");
   });
 
+  it("aprovar todas: publica só as listadas e ainda em revisão; sensível exige administrador", async () => {
+    const { approveAll } = await import("@/lib/news/editorial");
+    const mk = (headline: string, sensitive = false) =>
+      db.article.create({
+        data: { slug: `t-${Math.random().toString(36).slice(2)}`, status: "in_review", origin: "human", category: "outros", headline, dek: "d", body: "b", readingMinutes: 1, sensitive },
+      });
+    const a = await mk("Matéria A listada");
+    const b = await mk("Matéria B sensível", true);
+    const late = await mk("Matéria C chegou depois");
+    const editor = await db.adminUser.create({ data: { email: "editor-bulk@teste.local", name: "Ed", role: "editor", passwordHash: "x" } });
+    const r = await approveAll(db, { id: editor.id, role: "editor" }, [a.id, b.id]);
+    expect(r.approved).toBe(1);
+    expect(r.skipped).toEqual([{ headline: "Matéria B sensível", reason: "Tema sensível: somente um administrador pode publicar este texto." }]);
+    const status = async (id: string) => (await db.article.findUniqueOrThrow({ where: { id } })).status;
+    expect([await status(a.id), await status(b.id), await status(late.id)]).toEqual(["published", "in_review", "in_review"]);
+    // Repetir não publica de novo nem duplica auditoria.
+    expect((await approveAll(db, { id: editor.id, role: "editor" }, [a.id])).approved).toBe(0);
+    await db.article.deleteMany({ where: { id: { in: [b.id, late.id] } } });
+  });
+
   it("ciclo travado por processo encerrado é liberado após a janela da trava", async () => {
     vi.stubGlobal("fetch", mockFetch());
     const stale = await db.ingestionRun.create({

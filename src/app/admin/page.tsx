@@ -13,7 +13,8 @@ import { checkConfig, checkDatabase, checkNewsIngestion, checkSportsSource, deri
 import pkg from "../../../package.json";
 import { sourceById } from "@/lib/news/sources";
 import { ARTICLE_STATUS_LABEL, type ArticleStatus } from "@/lib/news/states";
-import { logoutAction, refreshSportsDataAction, runCycleAction, toggleSourceAction } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
+import { approveAllAction, logoutAction, refreshSportsDataAction, runCycleAction, toggleSourceAction } from "./actions";
 
 export const metadata: Metadata = { title: "Painel", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -371,6 +372,23 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
         {pending.length === 0 ? (
           <p className="text-sm text-muted">Nada pendente.</p>
         ) : (
+          <>
+          <form action={approveAllAction} className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-line bg-elev p-3">
+            {pending.map((a) => (
+              <input key={a.id} type="hidden" name="id" value={a.id} />
+            ))}
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="confirm" required className="h-4 w-4 accent-[var(--accent)]" />
+              Revisei {pending.length === 1 ? "a matéria" : `as ${pending.length} matérias`} da fila
+            </label>
+            <SubmitButton pending="Publicando…" className="rounded bg-accent px-3 py-1.5 text-sm font-semibold text-white">
+              Aprovar todas ({pending.length})
+            </SubmitButton>
+            <span className="text-xs text-faint">
+              Só as listadas abaixo. Tema sensível continua exigindo administrador
+              {pending.some((a) => a.sensitive) ? ` (${pending.filter((a) => a.sensitive).length} nesta fila)` : ""}.
+            </span>
+          </form>
           <Card className="overflow-x-auto">
             <table className="data-table">
               <thead>
@@ -405,6 +423,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
               </tbody>
             </table>
           </Card>
+          </>
         )}
       </section>
 

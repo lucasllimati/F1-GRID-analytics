@@ -12,7 +12,7 @@ import { rateLimit, resetRateLimit } from "@/lib/auth/rate-limit";
 import { createSessionToken, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { F1_CACHE_TAG } from "@/lib/f1/providers/jolpica";
-import { approveAndPublish, editArticle, EditorialError, reject, reopen, retract } from "@/lib/news/editorial";
+import { approveAll, approveAndPublish, editArticle, EditorialError, reject, reopen, retract } from "@/lib/news/editorial";
 import { LOCK_MINUTES } from "@/lib/news/pipeline";
 import { runConfiguredCycle } from "@/lib/news/run";
 import { env } from "@/lib/env";
@@ -149,6 +149,24 @@ async function articleAction(
 
 export async function approveAction(formData: FormData) {
   await articleAction(formData, (u, id) => approveAndPublish(db, u, id), "Aprovado e publicado.", "queue");
+}
+
+/** "Aprovar todas" da fila: exige confirmar que as matérias foram revisadas. */
+export async function approveAllAction(formData: FormData) {
+  const user = await requireUser();
+  if (formData.get("confirm") !== "on") back("/admin", "erro", "Marque \"Revisei as matérias\" para aprovar todas de uma vez.");
+  const ids = formData.getAll("id").map(String).filter((id) => zId.safeParse(id).success);
+  if (ids.length === 0) back("/admin", "erro", "Nenhuma matéria na fila para aprovar.");
+  const r = await approveAll(db, user, ids);
+  revalidatePath("/");
+  revalidatePath("/news");
+  revalidatePath("/news/[slug]", "page");
+  const left = await db.article.count({ where: { status: "in_review" } });
+  const skipped = r.skipped.length
+    ? ` ${r.skipped.length} não aprovada(s): ${r.skipped.slice(0, 3).map((x) => `"${x.headline.slice(0, 50)}" (${x.reason})`).join("; ")}.`
+    : "";
+  const tail = left === 0 ? " A fila de revisão está vazia." : ` ${left} matéria(s) ainda na fila.`;
+  redirect(`/admin?ok=${encodeURIComponent(`${r.approved} matéria(s) aprovada(s) e publicada(s).${skipped}${tail}`)}#fila`);
 }
 
 export async function rejectAction(formData: FormData) {
